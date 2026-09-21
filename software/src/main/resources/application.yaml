@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: service-track-catalogo
+  threads:
+    virtual:
+      enabled: true
+
+servicetrack:
+  security:
+    jwt:
+      habilitado: false
+      issuer: service-track-api
+      chave-publica: ${SERVICETRACK_JWT_CHAVE_PUBLICA:file:/keys/publicKey.pem}
+      claim-de-roles: groups
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+servicetrack:
+  security:
+    jwt:
+      habilitado: false
