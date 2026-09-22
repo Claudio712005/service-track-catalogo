@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: service-track-catalogo
+
+resources:
+  - ../../base
+
+components:
+  - ../../componentes/mongo-efemero
+
+images:
+  - name: servicetrack-catalogo
+    newName: 821146464895.dkr.ecr.us-east-1.amazonaws.com/servicetrack-hml-catalogo
+    newTag: bootstrap
+
+patches:
+  - path: hpa-patch.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: service-track-catalogo-config
+    literals:
+      - SPRING_MONGODB_URI=mongodb://service-track-catalogo-mongo:27017/catalogo
+      - OTEL_JAVAAGENT_ENABLED=false
