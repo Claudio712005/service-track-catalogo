@@ -134,6 +134,54 @@ Depois de logado, a `Application` deste serviço aparece em **Applications →
 service-track-catalogo-local**, com os dois pods do perfil local visíveis na
 árvore de recursos.
 
+## Parar a execução local
+
+Três níveis, do mais cirúrgico ao mais completo. Use o primeiro que resolver.
+
+### Só este microsserviço
+
+Remove a `Application`, e com ela — por causa do finalizer
+`resources-finalizer.argocd.argoproj.io` no manifesto — todo o namespace que
+ela criou: pods, `Service`, `ConfigMap`. Testado: a cascata deixa zero
+resíduo, sem precisar de um segundo comando para limpar o namespace.
+
+```bash
+kubectl delete -f k8s/argocd/local.yaml
+```
+
+O cluster `kind`, o ArgoCD e qualquer outro microsserviço nele continuam de
+pé. É o comando do dia a dia — usar antes de reconstruir a imagem já resolve
+o que `kind load docker-image` sozinho não limpa (pods antigos).
+
+### O cluster local inteiro
+
+Remove o cluster `kind` inteiro — ArgoCD, todos os microsserviços que estejam
+nele, tudo. Não é comando deste repositório (o cluster é provisionado pelo
+`aws-iac`), mas documentado aqui por simetria com "Subir localmente":
+
+```bash
+kind delete cluster --name service-track
+```
+
+Não sobra nada para desfazer depois — nem volume, nem imagem carregada. Da
+próxima vez, o bootstrap completo de "Subir localmente" roda do zero,
+incluindo `kind load docker-image` de novo (imagem carregada num cluster
+antigo não sobrevive à recriação dele).
+
+### Docker por completo
+
+Se não for usar Docker/kind por um tempo, parar a VM libera CPU e memória do
+host de vez — relevante aqui porque essa VM já precisou ser realocada de
+2 CPU/2 GiB para 6 CPU/8 GiB neste projeto (ver histórico de commits): rodar
+cluster + build ao mesmo tempo na alocação pequena sufocava a VM.
+
+```bash
+colima stop
+```
+
+`colima start` na próxima vez sobe de novo com os mesmos 6 CPU/8 GiB — a
+alocação de recursos persiste entre paradas, só a VM em si é desligada.
+
 ## Réplicas para outro microsserviço
 
 Copiar este diretório inteiro para o repositório novo e substituir
