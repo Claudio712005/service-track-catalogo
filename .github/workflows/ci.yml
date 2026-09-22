@@ -134,26 +134,36 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Conferir que a imagem sobe
+      - name: Conferir que a imagem sobe e fala com o Mongo
         run: |
-          docker run --rm -d --name catalogo \
+          docker network create catalogo-ci
+          docker run -d --name mongo --network catalogo-ci mongo:7
+
+          docker run -d --name catalogo --network catalogo-ci \
             -e SPRING_PROFILES_ACTIVE=dev \
+            -e SPRING_MONGODB_URI=mongodb://mongo:27017/catalogo \
             -p 8080:8080 \
             servicetrack-catalogo:${{ github.sha }}
+
+          limpar() {
+            docker rm -f catalogo mongo >/dev/null 2>&1 || true
+            docker network rm catalogo-ci >/dev/null 2>&1 || true
+          }
 
           for tentativa in $(seq 1 30); do
             CODIGO="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health || echo 000)"
             if [ "$CODIGO" = "200" ]; then
-              echo "Aplicacao respondeu em ${tentativa}0s."
-              docker rm -f catalogo >/dev/null
+              echo "Aplicacao respondeu UP em ${tentativa}0s."
+              limpar
               exit 0
             fi
             sleep 10
           done
 
-          echo "::error::A aplicacao nao respondeu em /actuator/health apos 5 minutos."
+          echo "::error::A aplicacao nao respondeu UP em /actuator/health apos 5 minutos."
+          curl -s http://localhost:8080/actuator/health || true
           docker logs catalogo | tail -n 100
-          docker rm -f catalogo >/dev/null
+          limpar
           exit 1
 
       - name: Tamanho da imagem
