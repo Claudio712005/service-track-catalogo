@@ -80,16 +80,59 @@ O `kind load docker-image` é obrigatório mesmo com o cluster já existindo: o
 kind não enxerga o Docker do host, a imagem precisa ser carregada
 explicitamente no nó do cluster a cada rebuild.
 
-O `kind load docker-image` é obrigatório: o kind não enxerga o Docker local do
-host, a imagem precisa ser carregada explicitamente no cluster.
-
 Conferir:
 
 ```bash
 kubectl -n argocd get application service-track-catalogo-local
 kubectl -n service-track-catalogo get pods -w
-kubectl -n service-track-catalogo port-forward svc/service-track-catalogo 8080:80
+kubectl -n service-track-catalogo port-forward svc/service-track-catalogo 18080:80
 ```
+
+**Não** use a porta `8080` para esse `port-forward`: o `kind/cluster.yaml` do
+`aws-iac` já mapeia essa porta do host para o `NodePort 30080` do monólito
+principal (`docker port service-track-control-plane` mostra
+`30080/tcp -> 0.0.0.0:8080`). Usar `8080` aqui falha com `bind: address
+already in use`, ou pior, parece funcionar e na verdade responde o outro
+serviço.
+
+## Acessar o ArgoCD localmente
+
+Não existe URL fixa: `argocd-server` é `ClusterIP`, sem NodePort, Ingress ou
+LoadBalancer — o bootstrap do `aws-iac` não expõe a UI externamente. O acesso
+é sempre por `kubectl port-forward`, criado sob demanda.
+
+```bash
+kubectl -n argocd port-forward svc/argocd-server 8443:443
+```
+
+Com o comando rodando (ele bloqueia o terminal — abra outro para o resto),
+acesse:
+
+```
+https://localhost:8443
+```
+
+O navegador vai reclamar de certificado: é autoassinado, do próprio ArgoCD.
+Aceitar o risco e prosseguir é esperado neste ambiente local.
+
+**Usuário:** `admin`. **Senha inicial**, gerada pelo próprio bootstrap e
+diferente a cada `kind create cluster`:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+```
+
+Se esse comando não devolver nada, a senha já foi trocada pela UI em algum
+momento — o ArgoCD apaga o secret `argocd-initial-admin-secret` após a
+primeira troca. Nesse caso, use a senha que você definiu.
+
+Não versionar a senha em nenhum lugar, nem citá-la em commit ou PR — ela
+autentica o ArgoCD deste cluster local, mesmo sendo efêmero.
+
+Depois de logado, a `Application` deste serviço aparece em **Applications →
+service-track-catalogo-local**, com os dois pods do perfil local visíveis na
+árvore de recursos.
 
 ## Réplicas para outro microsserviço
 
