@@ -5,22 +5,51 @@ daqui, ninguém roda `kubectl apply` na aplicação.
 
 ```
 k8s/
-├── base/                Deployment, Service ClusterIP, namespace
+├── base/                    Deployment, Service ClusterIP, namespace, HPA
+├── componentes/
+│   └── mongo-efemero/       Mongo de dado descartável, usado por hml e prd
 ├── overlays/
-│   ├── local/            kind, 2 réplicas, sem chave JWT
-│   ├── hml/               vazio — fora do escopo desta rodada
-│   └── prod/              vazio — fora do escopo desta rodada
+│   ├── local/               kind, imagem local, repositório em memória
+│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero
+│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero
 └── argocd/
-    └── local.yaml         Application do kind, aplicada à mão
+    ├── local.yaml           Application do kind, aplicada à mão
+    ├── hml.yaml             marcador de descoberta
+    └── prd.yaml             marcador de descoberta
+```
+
+## Como este serviço chega em hml e prd
+
+```
+infra/terraform (deste repo)  ->  ECR do ambiente + SSM com a URL
+esteira CD (deste repo)       ->  imagem com a tag do commit + PR trocando newTag
+merge na main                 ->  ArgoCD sincroniza k8s/overlays/<ambiente>
+```
+
+A `Application` em `hml`/`prd` **não** vem de `k8s/argocd/<ambiente>.yaml`: a esteira do
+`aws-iac` usa esse arquivo só como marcador de descoberta e gera a `Application` a partir
+do template dela. O conteúdo daqui serve ao fluxo local e mantém o desenho visível.
+
+Enquanto o CD não rodar pela primeira vez, `newTag` aponta para `bootstrap`, que não existe
+no ECR: os pods ficam em `ImagePullBackOff`. É esperado num ambiente recém-criado.
+
+Ver os pods no cluster da AWS:
+
+```bash
+aws eks update-kubeconfig --name servicetrack-hml --region us-east-1
+kubectl -n service-track-catalogo get pods -o wide
+kubectl -n argocd get application service-track-catalogo-hml
 ```
 
 ## Este serviço não é alcançável de fora do cluster
 
-O `Service` é `ClusterIP`, em todos os ambientes. Diferente do monólito principal
-(que expõe `NodePort 30080` para o API Gateway alcançar via NLB), este
-microsserviço só é consumido por outros serviços dentro do cluster — BFF ou
-demais microsserviços. Não há NodePort, Ingress nem LoadBalancer neste
-diretório, e nenhum overlay deve introduzir um.
+O `Service` é `ClusterIP`, em todos os ambientes, inclusive `hml` e `prd`. O API Gateway
+não tem backend no cluster, e este microsserviço só é consumido por outros serviços de
+dentro do cluster — um BFF ou outro microsserviço. Não há NodePort, Ingress nem
+LoadBalancer neste diretório, e nenhum overlay deve introduzir um.
+
+Para testar de fora, na AWS, o caminho é o mesmo do local: `kubectl port-forward`. É você
+alcançando o cluster com a sua credencial, não a aplicação exposta na internet.
 
 Isso é aplicado por omissão (não existe caminho de entrada externo), não por
 NetworkPolicy — o kind usa kindnet, que não impõe NetworkPolicy, e o EKS da
@@ -107,12 +136,8 @@ kubectl -n service-track-catalogo get pods -w
 kubectl -n service-track-catalogo port-forward svc/service-track-catalogo 18080:80
 ```
 
-**Não** use a porta `8080` para esse `port-forward`: o `kind/cluster.yaml` do
-`aws-iac` já mapeia essa porta do host para o `NodePort 30080` do monólito
-principal (`docker port service-track-control-plane` mostra
-`30080/tcp -> 0.0.0.0:8080`). Usar `8080` aqui falha com `bind: address
-already in use`, ou pior, parece funcionar e na verdade responde o outro
-serviço.
+A porta `18080` é só convenção. Clusters kind criados antes da Fase 4 ainda mapeiam
+a `8080` do host para o `NodePort 30080` do monólito; nesses, a `8080` já está ocupada.
 
 ## Acessar o ArgoCD localmente
 
@@ -319,16 +344,38 @@ Copiar este diretório inteiro para o repositório novo e substituir
 probes, os requests e a ausência de exposição externa se aplicam a qualquer
 microsserviço interno.
 
+## Banco em hml e prd: Mongo efêmero
+
+`componentes/mongo-efemero` sobe um `mongo:7` de uma réplica, com `emptyDir`, dentro do
+namespace do serviço. **O dado se perde a cada restart do pod** — é o suficiente para
+demonstrar o serviço de pé, não para guardar nada.
+
+Está aqui, e não no `aws-iac`, porque banco de microsserviço é do microsserviço. Sai quando
+`GLOBAL-RFC-009` decidir a arquitetura de dados (MongoDB Atlas, DocumentDB ou outra coisa);
+trocar significa mudar `SPRING_MONGODB_URI` no `configMapGenerator` do overlay e remover o
+componente.
+
+O grupo `readiness` do Spring **não** inclui o Mongo: o pod fica `Ready` mesmo sem banco, e
+só `/actuator/health` (completo) acusa `DOWN`. Por isso a esteira de CI sobe um Mongo ao lado
+da imagem e checa o health completo — sem isso o teste de fumaça passaria com o banco
+inalcançável.
+
 ## Pendências conhecidas
 
-- **`project: default`** na `Application` — provisório. Assim que a topologia
-  GitOps de múltiplos microsserviços for decidida (`GLOBAL-RFC-009`), isso
-  deve migrar para um `AppProject` próprio, análogo ao `service-track` que já
-  existe em `aws-iac`.
-- **Sem MongoDB local.** O repositório de serviços hoje é
-  `ServicoRepositoryMemoriaAdapter`, em memória — o perfil local não precisa
-  de banco ainda. Quando a persistência Mongo entrar (fase F1 do plano de
-  evolução), este overlay ganha um Deployment de Mongo efêmero, no mesmo
-  padrão do `postgres.yaml` do monólito principal.
+- **`k8s/argocd/<ambiente>.yaml` é marcador de descoberta.** A esteira do
+  `aws-iac` procura esse arquivo em cada repositório e gera a `Application`
+  a partir de um template próprio — o conteúdo daqui não é o que vai para o
+  cluster em `hml`/`prd`. Mantido alinhado (`project: service-track`) para que
+  o `kubectl apply` manual do fluxo local produza a mesma coisa.
+- **Mongo efêmero é provisório.** `emptyDir`, sem réplica, sem backup, sem senha. Serve a
+  demonstração e some quando a arquitetura de dados fechar.
+- **Sem MongoDB no overlay local.** O repositório de serviços hoje é
+  `ServicoRepositoryMemoriaAdapter`, em memória. Para exercitar o Mongo
+  localmente, basta incluir o componente no `kustomization.yaml` do overlay
+  `local` e apontar `SPRING_MONGODB_URI` para ele.
+- **Sem JWT em `hml` e `prd`.** `servicetrack.security.jwt.habilitado` continua
+  `false` no `application.yaml`. A Lambda de autenticação está desligada no
+  `aws-iac` (`habilitar_autenticacao = false`), então nem existe emissor de
+  token nem chave pública publicada no SSM hoje.
 - **Sem OTLP local.** Nenhum coletor de observabilidade roda no kind hoje;
   `OTEL_JAVAAGENT_ENABLED=false` reflete isso, não uma escolha permanente.
