@@ -12,6 +12,7 @@ images:
 
 patches:
   - path: patch.yaml
+  - path: hpa-patch.yaml
 
 generatorOptions:
   disableNameSuffixHash: true

@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   name: service-track-catalogo
 spec:
-  replicas: 2
   template:
     spec:
       containers:
