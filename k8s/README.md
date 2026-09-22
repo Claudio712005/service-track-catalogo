@@ -31,17 +31,36 @@ repositório.
 
 ## Perfil local
 
-- **2 réplicas por padrão**, não 1: qualquer teste já observa balanceamento
-  entre pods sem precisar disparar um scale primeiro.
-- **`kubectl scale deployment/service-track-catalogo -n service-track-catalogo
-  --replicas=N`** é o jeito fácil de testar escala horizontal manualmente.
-  Não há HPA no perfil local — HPA depende de `metrics-server`, que não está
-  instalado no kind por padrão, e sem carga real numa máquina de desenvolvedor
-  ele não aciona de forma confiável. HPA fica para quando o overlay de `prd`
-  for construído, seguindo o padrão do monólito principal.
+- **HPA ativo**, `minReplicas: 2` / `maxReplicas: 3`, CPU alvo `50%` (a
+  definição genérica vive em `base/hpa.yaml`; este overlay só ajusta os
+  números via `hpa-patch.yaml`). Exige `metrics-server` no cluster — **não é
+  instalado pelo bootstrap do `aws-iac`**, é passo manual, um por cluster:
+
+  ```bash
+  kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+  kubectl -n kube-system patch deployment metrics-server --type=json \
+    -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+  ```
+
+  O patch de TLS inseguro é específico do `kind`: o certificado do kubelet lá
+  dentro é autoassinado, e o `metrics-server` recusa por padrão. Sem ele, o
+  deployment sobe mas nunca fica `Ready` — `kubectl -n kube-system logs
+  deploy/metrics-server` mostra erro de certificado.
+
+  Testado disparando carga real (dois pods empurrados a mais de 500% do
+  request de CPU) — o HPA escalou 2 → 3 em segundos, com o motivo exato no
+  `kubectl get events`: `cpu resource utilization (percentage of request)
+  above target`. Detalhado, com o que cada campo significa, no documento de
+  estudo (ver final deste README).
+- **`kubectl scale --replicas=N` não funciona bem com HPA presente** — o
+  controller do HPA reconcilia por cima em segundos e desfaz o scale manual.
+  Para testar escala manualmente, é mais direto editar `minReplicas`/
+  `maxReplicas` no `hpa-patch.yaml`, ou gerar carga de verdade contra o
+  serviço (exemplo de comando no documento de estudo).
 - **Requests baixos de propósito** (100m CPU / 320Mi memória): é o que
-  realmente limita quantas réplicas cabem num kind rodando no seu laptop.
-  Reduzir isso importa mais para "escalar com facilidade" do que ligar HPA.
+  realmente limita quantas réplicas cabem num kind rodando no seu laptop, e é
+  a base sobre a qual o `averageUtilization: 50%` do HPA local foi calibrado
+  (50% de 100m = 50m — atingível sem gerar uma carga absurda).
 - **`SPRING_PROFILES_ACTIVE=dev`** desliga a validação de JWT
   (`SecurityConfigDesenvolvimento`, com aviso de log na subida). Evita
   gerenciar par de chaves RS256 só para testar deploy e escala localmente.
@@ -195,10 +214,13 @@ kubectl -n $NS describe pod <nome-do-pod>    # eventos de agendamento, probes, r
 kubectl -n $NS get events --sort-by='.lastTimestamp'   # eventos do namespace inteiro, mais recente por último
 ```
 
-**`kubectl top pods` não funciona aqui** — exige `metrics-server`, que não
-está instalado neste cluster (mesmo motivo pelo qual não há HPA no perfil
-local; ver "Perfil local" acima). Sem ele o comando responde `Metrics API
-not available`, não é o pod que está com problema.
+```bash
+kubectl -n $NS top pods    # exige metrics-server — comando de instalação em "Perfil local" acima
+```
+
+Sem `metrics-server` instalado, esse comando responde `Metrics API not
+available` — não é o pod que está com problema, é a peça de infraestrutura
+que falta.
 
 ### Mandar requisição para o serviço — que só existe dentro do cluster
 
