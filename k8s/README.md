@@ -134,6 +134,112 @@ Depois de logado, a `Application` deste serviço aparece em **Applications →
 service-track-catalogo-local**, com os dois pods do perfil local visíveis na
 árvore de recursos.
 
+## Comandos do dia a dia
+
+Todos testados contra um cluster local de verdade. Namespace fixo nos
+exemplos — exporte uma vez e reaproveite:
+
+```bash
+export NS=service-track-catalogo
+```
+
+### Primeiro: confirmar o contexto certo
+
+O `kubeconfig` deste projeto acumula os contextos das contas AWS Academy das
+Fases 3/4 (`servicetrack-dev`, `-hml`, `-prd`) **junto** com o `kind`. Rodar
+um comando sem checar o contexto ativo, contra um EKS que expirou, dá erro
+confuso de rede — não fica óbvio que o problema é o alvo errado, não o
+cluster local.
+
+```bash
+kubectl config current-context
+```
+
+Precisa ser `kind-service-track`. Se vier outra coisa:
+
+```bash
+kubectl config use-context kind-service-track
+```
+
+Se o comando reclamar que o contexto **não existe**, o cluster foi destruído
+(sobrevive a `colima stop`, não sobrevive a um reinício da VM ou do host) —
+volta para "Subir localmente" acima e recria do zero.
+
+### Cluster
+
+```bash
+kubectl cluster-info                 # endereço do control plane
+kubectl get nodes -o wide            # nós disponíveis (kind = 1 nó só)
+```
+
+### Pods
+
+```bash
+kubectl -n $NS get pods -o wide      # lista com IP e node
+kubectl -n $NS get pods -w           # acompanha em tempo real (Ctrl+C sai)
+kubectl -n $NS get all               # Deployment, ReplicaSet, Service e Pods juntos
+```
+
+### Logs
+
+```bash
+kubectl -n $NS logs -l app=service-track-catalogo --tail=50 --prefix    # os dois pods, prefixados por nome
+kubectl -n $NS logs <nome-do-pod> -f                                    # segue um pod específico
+kubectl -n $NS logs <nome-do-pod> --previous                            # log do container anterior, após um crash
+```
+
+### Investigar um pod
+
+```bash
+kubectl -n $NS describe pod <nome-do-pod>    # eventos de agendamento, probes, restarts
+kubectl -n $NS get events --sort-by='.lastTimestamp'   # eventos do namespace inteiro, mais recente por último
+```
+
+**`kubectl top pods` não funciona aqui** — exige `metrics-server`, que não
+está instalado neste cluster (mesmo motivo pelo qual não há HPA no perfil
+local; ver "Perfil local" acima). Sem ele o comando responde `Metrics API
+not available`, não é o pod que está com problema.
+
+### Mandar requisição para o serviço — que só existe dentro do cluster
+
+Não tem `curl` na imagem da aplicação (só o `wget` do Alpine, herdado da
+imagem base). Três formas, da mais simples à mais próxima de produção:
+
+**De dentro do próprio pod, com `wget`:**
+
+```bash
+POD=$(kubectl -n $NS get pods -o jsonpath='{.items[0].metadata.name}')
+kubectl -n $NS exec "$POD" -- wget -qO- http://localhost:8080/servicos
+```
+
+**De um pod efêmero de teste, pelo nome curto do `Service`** — funciona
+porque o pod de teste está no mesmo namespace, e é o caminho mais parecido
+com o de outro microsserviço chamando este:
+
+```bash
+kubectl -n $NS run debug-curl --rm -i --restart=Never --image=curlimages/curl -- \
+  curl -s http://service-track-catalogo/servicos
+```
+
+O mesmo pod, de **outro** namespace, precisa do nome qualificado
+(`<service>.<namespace>.svc.cluster.local`) — é assim que um outro
+microsserviço, no namespace dele, vai chamar este:
+
+```bash
+kubectl run debug-curl --rm -i --restart=Never --image=curlimages/curl -- \
+  curl -s http://service-track-catalogo.service-track-catalogo.svc.cluster.local/servicos
+```
+
+**Do seu terminal, fora do cluster**, com `port-forward` — único caso onde
+"fora do cluster" faz sentido, porque é você testando, não outro serviço:
+
+```bash
+kubectl -n $NS port-forward svc/service-track-catalogo 18080:80
+curl -s http://localhost:18080/servicos
+```
+
+Lembrete da porta: `18080`, não `8080` — motivo em "Subir localmente" acima.
+
 ## Parar a execução local
 
 Três níveis, do mais cirúrgico ao mais completo. Use o primeiro que resolver.
