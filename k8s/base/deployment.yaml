@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-track-catalogo
+  labels:
+    app: service-track-catalogo
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  progressDeadlineSeconds: 300
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: service-track-catalogo
+  template:
+    metadata:
+      labels:
+        app: service-track-catalogo
+    spec:
+      containers:
+        - name: service-track-catalogo
+          image: servicetrack-catalogo:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: service-track-catalogo-config
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 320Mi
+            limits:
+              memory: 384Mi
