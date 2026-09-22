@@ -6,7 +6,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: service-track
   source:
     repoURL: https://github.com/Claudio712005/service-track-catalogo.git
     targetRevision: main
