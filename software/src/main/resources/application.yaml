@@ -28,6 +28,8 @@ spring:
   config:
     activate:
       on-profile: dev
+  mongodb:
+    uri: mongodb://localhost:27017/catalogo?serverSelectionTimeoutMS=2000&connectTimeoutMS=2000
 
 servicetrack:
   security:

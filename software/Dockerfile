@@ -38,13 +38,19 @@ RUN apk add --no-cache curl && \
       "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar" && \
     test -s /preparo/opentelemetry-javaagent.jar
 
-WORKDIR /preparo/extraido
+RUN mkdir -p /preparo/execucao \
+    && cp -rl /preparo/extraido/dependencies/. /preparo/execucao/ \
+    && cp -rl /preparo/extraido/spring-boot-loader/. /preparo/execucao/ \
+    && cp -rl /preparo/extraido/snapshot-dependencies/. /preparo/execucao/ \
+    && cp -rl /preparo/extraido/application/. /preparo/execucao/
+
+WORKDIR /preparo/execucao
 
 RUN java -XX:ArchiveClassesAtExit=/preparo/aplicacao.jsa \
          -Dspring.context.exit=onRefresh \
          -Dservicetrack.security.jwt.habilitado=false \
          -Dspring.main.banner-mode=off \
-         -jar aplicacao.jar > /preparo/treino.log 2>&1 \
+         org.springframework.boot.loader.launch.JarLauncher > /preparo/treino.log 2>&1 \
     && test -s /preparo/aplicacao.jsa \
     || (echo "AVISO: arquivo CDS nao gerado; a imagem sobe sem ele" && cat /preparo/treino.log | tail -20 && rm -f /preparo/aplicacao.jsa && touch /preparo/aplicacao.jsa)
 
@@ -79,4 +85,4 @@ ENV JDK_JAVA_OPTIONS="\
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-javaagent:/app/opentelemetry-javaagent.jar", "-jar", "aplicacao.jar"]
+ENTRYPOINT ["java", "-javaagent:/app/opentelemetry-javaagent.jar", "org.springframework.boot.loader.launch.JarLauncher"]
