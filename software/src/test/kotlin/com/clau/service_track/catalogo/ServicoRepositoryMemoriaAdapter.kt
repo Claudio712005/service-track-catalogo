@@ -1,14 +1,16 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.out.repository
+package com.clau.service_track.catalogo
 
 import com.clau.service_track.catalogo.application.port.out.repository.ServicoRepositoryPort
 import com.clau.service_track.catalogo.domain.model.Servico
 import com.clau.service_track.catalogo.domain.vo.DomainId
 import com.clau.service_track.catalogo.domain.vo.ValorMonetario
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 @Repository
+@Profile("teste")
 class ServicoRepositoryMemoriaAdapter : ServicoRepositoryPort {
 
     private val acervo = ConcurrentHashMap<String, Servico>()

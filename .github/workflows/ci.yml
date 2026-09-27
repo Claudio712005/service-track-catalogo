@@ -134,21 +134,48 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Conferir que a imagem sobe e fala com o Mongo
+      - name: Conferir que a imagem sobe e fala com os dois bancos
         run: |
           docker network create catalogo-ci
           docker run -d --name mongo --network catalogo-ci mongo:7
+          docker run -d --name postgres --network catalogo-ci \
+            -e POSTGRES_DB=st_cat \
+            -e POSTGRES_USER=st_cat_user \
+            -e POSTGRES_PASSWORD=st_cat_ci \
+            postgres:16
+
+          limpar() {
+            docker rm -f catalogo postgres mongo >/dev/null 2>&1 || true
+            docker network rm catalogo-ci >/dev/null 2>&1 || true
+          }
+
+          for tentativa in $(seq 1 30); do
+            docker exec postgres pg_isready -U st_cat_user -d st_cat >/dev/null 2>&1 && break
+            sleep 2
+          done
+
+          docker cp db/postgres/01_baseline_st_cat.sql postgres:/tmp/baseline.sql
+          if ! docker exec postgres psql -v ON_ERROR_STOP=1 -U st_cat_user -d st_cat -f /tmp/baseline.sql; then
+            echo "::error::O baseline do Postgres falhou. Sem Flyway, nada mais aplica o schema."
+            limpar
+            exit 1
+          fi
+
+          docker cp db/mongo/01_baseline_st_ins.js mongo:/tmp/baseline.js
+          if ! docker exec mongo mongosh ST_INS --quiet --file /tmp/baseline.js; then
+            echo "::error::O baseline do MongoDB falhou."
+            limpar
+            exit 1
+          fi
 
           docker run -d --name catalogo --network catalogo-ci \
             -e SPRING_PROFILES_ACTIVE=dev \
-            -e SPRING_MONGODB_URI=mongodb://mongo:27017/catalogo \
+            -e ST_CAT_DB_URL=jdbc:postgresql://postgres:5432/st_cat \
+            -e ST_CAT_DB_USER=st_cat_user \
+            -e ST_CAT_DB_PASSWORD=st_cat_ci \
+            -e ST_INS_MONGO_URI=mongodb://mongo:27017/ST_INS \
             -p 8080:8080 \
             servicetrack-catalogo:${{ github.sha }}
-
-          limpar() {
-            docker rm -f catalogo mongo >/dev/null 2>&1 || true
-            docker network rm catalogo-ci >/dev/null 2>&1 || true
-          }
 
           for tentativa in $(seq 1 30); do
             CODIGO="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health || echo 000)"

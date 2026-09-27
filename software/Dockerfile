@@ -50,6 +50,8 @@ RUN java -XX:ArchiveClassesAtExit=/preparo/aplicacao.jsa \
          -Dspring.context.exit=onRefresh \
          -Dservicetrack.security.jwt.habilitado=false \
          -Dspring.main.banner-mode=off \
+         -Dspring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration \
+         -DST_INS_MONGO_URI=mongodb://localhost:27017/ST_INS \
          org.springframework.boot.loader.launch.JarLauncher > /preparo/treino.log 2>&1 \
     && test -s /preparo/aplicacao.jsa \
     || (echo "AVISO: arquivo CDS nao gerado; a imagem sobe sem ele" && cat /preparo/treino.log | tail -20 && rm -f /preparo/aplicacao.jsa && touch /preparo/aplicacao.jsa)

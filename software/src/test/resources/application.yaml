@@ -1,4 +1,18 @@
+spring:
+  profiles:
+    active: teste
+
 servicetrack:
   security:
     jwt:
       habilitado: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: teste
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration

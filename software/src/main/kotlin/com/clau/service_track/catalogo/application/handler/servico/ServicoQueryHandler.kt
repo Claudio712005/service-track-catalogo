@@ -7,6 +7,7 @@ import com.clau.service_track.catalogo.application.port.`in`.useCase.servico.Lis
 import com.clau.service_track.catalogo.application.port.`in`.useCase.servico.ListarServicosUseCase
 import com.clau.service_track.catalogo.application.port.out.repository.ServicoRepositoryPort
 import com.clau.service_track.catalogo.domain.model.Servico
+import com.clau.service_track.catalogo.shared.OrdemDeExibicao
 import com.clau.service_track.catalogo.shared.annotation.UseCase
 
 @UseCase
@@ -19,5 +20,5 @@ class ServicoQueryHandler(
             ?: throw RecursoNaoEncontradoException("Serviço", consulta.id.value)
 
     override fun executar(consulta: ListarServicosQuery): List<Servico> =
-        repositorio.listar(consulta.incluirInativos).sortedBy { it.nome }
+        repositorio.listar(consulta.incluirInativos).sortedWith(compareBy(OrdemDeExibicao.porNome()) { it.nome })
 }
