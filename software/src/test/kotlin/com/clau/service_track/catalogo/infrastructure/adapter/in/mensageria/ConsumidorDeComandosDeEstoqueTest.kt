@@ -1,4 +1,4 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria
 
 import com.clau.service_track.catalogo.EstoqueRepositoryMemoriaAdapter
 import com.clau.service_track.catalogo.InsumoRepositoryMemoriaAdapter
@@ -7,12 +7,8 @@ import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.Lib
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.RegistrarEntradaUseCase
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueUseCase
 import com.clau.service_track.catalogo.domain.vo.DomainId
+import com.clau.service_track.catalogo.infrastructure.adapter.out.observabilidade.MetricasDeEstoque
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.junit.jupiter.api.BeforeEach
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
-import tools.jackson.databind.ObjectMapper
 import java.math.BigDecimal
 import java.util.UUID
 import kotlin.test.Test
@@ -21,6 +17,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.junit.jupiter.api.BeforeEach
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest
 class ConsumidorDeComandosDeEstoqueTest {

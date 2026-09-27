@@ -1,7 +1,14 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria
 
+import com.clau.service_track.catalogo.infrastructure.adapter.config.mensageria.PropriedadesDeMensageria
+import com.clau.service_track.catalogo.infrastructure.adapter.out.observabilidade.MetricasDeEstoque
+import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.CorrelacaoDoEnvelope
 import com.clau.service_track.catalogo.infrastructure.adapter.out.repository.postgres.OutboxJpaRepository
 import com.clau.service_track.catalogo.infrastructure.entity.postgres.OutboxEntity
+import java.nio.charset.StandardCharsets
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.slf4j.LoggerFactory
@@ -10,10 +17,6 @@ import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
-import java.nio.charset.StandardCharsets
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.util.concurrent.TimeUnit
 
 @Component
 @ConditionalOnProperty(prefix = "servicetrack.mensageria", name = ["habilitada"], havingValue = "true")
@@ -59,8 +62,6 @@ class PublicadorDeOutbox(
 
     private fun cabecalho(nome: String, valor: String) =
         RecordHeader(nome, valor.toByteArray(StandardCharsets.UTF_8))
-
-    private data class CorrelacaoDoEnvelope(val correlationId: String? = null)
 
     private companion object {
         const val CABECALHO_TIPO = "X-Tipo-Evento"

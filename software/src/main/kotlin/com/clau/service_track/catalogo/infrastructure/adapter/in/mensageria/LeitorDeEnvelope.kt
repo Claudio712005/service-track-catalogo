@@ -1,10 +1,11 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria
 
+import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dto.EnvelopeDeMensagem
+import java.nio.charset.StandardCharsets
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.springframework.stereotype.Component
 import tools.jackson.core.JacksonException
 import tools.jackson.databind.ObjectMapper
-import java.nio.charset.StandardCharsets
 
 @Component
 class LeitorDeEnvelope(

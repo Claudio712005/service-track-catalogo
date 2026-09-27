@@ -1,4 +1,4 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dto
 
 import tools.jackson.databind.JsonNode
 import java.time.OffsetDateTime
@@ -12,5 +12,3 @@ data class EnvelopeDeMensagem(
     val traceId: String?,
     val dados: JsonNode,
 )
-
-class MensagemInvalidaException(mensagem: String, causa: Throwable? = null) : RuntimeException(mensagem, causa)

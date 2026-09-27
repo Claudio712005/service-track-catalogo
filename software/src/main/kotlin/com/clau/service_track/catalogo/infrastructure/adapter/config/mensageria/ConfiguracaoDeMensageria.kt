@@ -1,7 +1,9 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.config.mensageria
 
 import com.clau.service_track.catalogo.application.exception.RecursoNaoEncontradoException
 import com.clau.service_track.catalogo.domain.exception.DomainException
+import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.MensagemInvalidaException
+import com.clau.service_track.catalogo.infrastructure.adapter.out.observabilidade.MetricasDeEstoque
 import com.clau.service_track.catalogo.infrastructure.adapter.out.repository.postgres.OutboxJpaRepository
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.common.TopicPartition

@@ -13,6 +13,7 @@ import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.Res
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueUseCase
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ResultadoDeSaldo
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ResultadoDoPasso
+import com.clau.service_track.catalogo.application.port.out.mensageria.FabricaDeEventoDeEstoquePort
 import com.clau.service_track.catalogo.application.port.out.mensageria.RegistroDeMensagemPort
 import com.clau.service_track.catalogo.application.port.out.repository.AlteracaoDeEstoque
 import com.clau.service_track.catalogo.application.port.out.repository.EstoqueRepositoryPort
@@ -24,15 +25,15 @@ import com.clau.service_track.catalogo.domain.model.SaldoDeInsumo
 import com.clau.service_track.catalogo.domain.model.SaldoInsuficienteException
 import com.clau.service_track.catalogo.domain.vo.DomainId
 import com.clau.service_track.catalogo.shared.annotation.UseCase
-import org.slf4j.LoggerFactory
 import java.time.LocalDateTime
+import org.slf4j.LoggerFactory
 
 @UseCase
 class EstoqueCommandHandler(
     private val estoque: EstoqueRepositoryPort,
     private val insumos: InsumoRepositoryPort,
     private val mensagens: RegistroDeMensagemPort,
-    private val eventos: FabricaDeEventoDeEstoque,
+    private val eventos: FabricaDeEventoDeEstoquePort,
 ) : RegistrarEntradaUseCase,
     ReservarEstoqueUseCase,
     ConsumirReservaUseCase,

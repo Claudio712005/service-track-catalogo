@@ -1,4 +1,4 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.config.mensageria
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
@@ -35,13 +35,4 @@ data class PropriedadesDeMensageria(
 
     val topicoDaDlt: String
         get() = topicoDeComandos + sufixoDaDlt
-
-    data class ExpiracaoDeReservas(
-
-        val habilitada: Boolean = true,
-
-        val intervalo: Duration = Duration.ofSeconds(60),
-
-        val lote: Int = 100,
-    )
 }

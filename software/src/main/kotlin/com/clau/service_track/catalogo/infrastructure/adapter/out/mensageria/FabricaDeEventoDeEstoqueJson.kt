@@ -1,23 +1,26 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria
 
-import com.clau.service_track.catalogo.application.handler.estoque.FabricaDeEventoDeEstoque
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueCommand
+import com.clau.service_track.catalogo.application.port.out.mensageria.FabricaDeEventoDeEstoquePort
 import com.clau.service_track.catalogo.application.port.out.repository.EventoParaPublicar
 import com.clau.service_track.catalogo.domain.model.Insumo
 import com.clau.service_track.catalogo.domain.model.ResultadoDeReserva
 import com.clau.service_track.catalogo.domain.model.SaldoDeInsumo
+import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.DadosDeReservaDeEstoque
+import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.DadosDeReservaRecusada
+import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.EnvelopeDeSaida
 import com.clau.service_track.catalogo.infrastructure.adapter.web.filter.CorrelacaoFilter
-import org.slf4j.MDC
-import org.springframework.stereotype.Component
-import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import org.slf4j.MDC
+import org.springframework.stereotype.Component
+import tools.jackson.databind.ObjectMapper
 
 @Component
 class FabricaDeEventoDeEstoqueJson(
     private val mapper: ObjectMapper,
-) : FabricaDeEventoDeEstoque {
+) : FabricaDeEventoDeEstoquePort {
 
     override fun estoqueReservado(insumo: Insumo, resultado: ResultadoDeReserva, saldo: SaldoDeInsumo, traceId: String?) =
         evento(ESTOQUE_RESERVADO, insumo, resultado, saldo, traceId)

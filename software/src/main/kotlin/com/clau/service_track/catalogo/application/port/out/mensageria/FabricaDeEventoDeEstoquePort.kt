@@ -1,4 +1,4 @@
-package com.clau.service_track.catalogo.application.handler.estoque
+package com.clau.service_track.catalogo.application.port.out.mensageria
 
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueCommand
 import com.clau.service_track.catalogo.application.port.out.repository.EventoParaPublicar
@@ -6,7 +6,7 @@ import com.clau.service_track.catalogo.domain.model.Insumo
 import com.clau.service_track.catalogo.domain.model.ResultadoDeReserva
 import com.clau.service_track.catalogo.domain.model.SaldoDeInsumo
 
-interface FabricaDeEventoDeEstoque {
+interface FabricaDeEventoDeEstoquePort {
 
     fun estoqueReservado(
         insumo: Insumo,

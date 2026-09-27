@@ -1,4 +1,4 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria
 
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ConsumirReservaCommand
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ConsumirReservaUseCase
@@ -10,14 +10,19 @@ import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.Res
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueUseCase
 import com.clau.service_track.catalogo.domain.vo.DomainId
 import com.clau.service_track.catalogo.domain.vo.ValorMonetario
+import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dto.DadosDeEntradaDeEstoque
+import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dto.DadosDeReservaEmAndamento
+import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dto.DadosDeReservarEstoque
+import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dto.EnvelopeDeMensagem
+import com.clau.service_track.catalogo.infrastructure.adapter.out.observabilidade.MetricasDeEstoque
 import com.clau.service_track.catalogo.infrastructure.adapter.web.filter.CorrelacaoFilter
+import java.util.UUID
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
-import java.util.UUID
 
 @Component
 @ConditionalOnProperty(prefix = "servicetrack.mensageria", name = ["habilitada"], havingValue = "true")

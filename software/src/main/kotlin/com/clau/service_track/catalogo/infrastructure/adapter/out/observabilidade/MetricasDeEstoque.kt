@@ -1,4 +1,4 @@
-package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
+package com.clau.service_track.catalogo.infrastructure.adapter.out.observabilidade
 
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
