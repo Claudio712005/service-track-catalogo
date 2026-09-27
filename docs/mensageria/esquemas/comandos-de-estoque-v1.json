@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "servicetrack/estoque/comandos/v1",
+  "title": "Comandos de estoque do catalogo, versao 1",
+  "description": "Contrato do topico servicetrack.estoque.comandos.v1. O dono e o servico que publica os comandos; este arquivo e a leitura que o catalogo faz dele. Campo desconhecido em dados e ignorado, para que evolucao aditiva nao exija deploy combinado.",
+  "type": "object",
+  "required": ["idMensagem", "tipo", "ocorridoEm", "dados"],
+  "properties": {
+    "idMensagem": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 120,
+      "description": "Chave de idempotencia. Reentrega com o mesmo valor nao aplica efeito de novo."
+    },
+    "tipo": {
+      "enum": ["ReservarEstoque", "ConsumirReserva", "LiberarReserva", "RegistrarEntradaDeEstoque"]
+    },
+    "versao": { "type": "integer", "minimum": 1, "default": 1 },
+    "ocorridoEm": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": ["string", "null"], "maxLength": 64 },
+    "traceId": { "type": ["string", "null"], "maxLength": 64 },
+    "dados": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "tipo": { "const": "ReservarEstoque" } } },
+      "then": { "properties": { "dados": { "$ref": "#/$defs/reservarEstoque" } } }
+    },
+    {
+      "if": { "properties": { "tipo": { "const": "ConsumirReserva" } } },
+      "then": { "properties": { "dados": { "$ref": "#/$defs/reservaEmAndamento" } } }
+    },
+    {
+      "if": { "properties": { "tipo": { "const": "LiberarReserva" } } },
+      "then": { "properties": { "dados": { "$ref": "#/$defs/reservaEmAndamento" } } }
+    },
+    {
+      "if": { "properties": { "tipo": { "const": "RegistrarEntradaDeEstoque" } } },
+      "then": { "properties": { "dados": { "$ref": "#/$defs/entradaDeEstoque" } } }
+    }
+  ],
+  "$defs": {
+    "reservarEstoque": {
+      "type": "object",
+      "required": ["insumoId", "ordemServicoId", "quantidade"],
+      "properties": {
+        "insumoId": { "type": "string", "format": "uuid" },
+        "ordemServicoId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Tambem e a chave da mensagem no broker, o que preserva a ordem dos passos da saga."
+        },
+        "quantidade": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Na unidade do insumo. Unidade nao fracionavel recusa valor com decimal."
+        },
+        "expiraEm": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Prazo da reserva, sem offset, em UTC. Vencido sem a saga concluir, o estoque e devolvido pela rotina de expiracao. Nulo significa sem prazo."
+        }
+      }
+    },
+    "reservaEmAndamento": {
+      "type": "object",
+      "required": ["insumoId", "ordemServicoId"],
+      "properties": {
+        "insumoId": { "type": "string", "format": "uuid" },
+        "ordemServicoId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "entradaDeEstoque": {
+      "type": "object",
+      "required": ["insumoId", "quantidade"],
+      "properties": {
+        "insumoId": { "type": "string", "format": "uuid" },
+        "quantidade": { "type": "number", "exclusiveMinimum": 0 },
+        "custoUnitario": { "type": ["number", "null"], "minimum": 0 },
+        "origemTipo": {
+          "enum": ["NOTA_ENTRADA", "INVENTARIO", "AJUSTE_MANUAL"],
+          "default": "NOTA_ENTRADA"
+        },
+        "origemId": { "type": ["string", "null"], "format": "uuid" },
+        "registradoPor": { "type": ["string", "null"], "format": "uuid" }
+      }
+    }
+  }
+}
