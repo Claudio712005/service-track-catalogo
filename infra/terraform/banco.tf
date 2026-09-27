@@ -36,11 +36,6 @@ resource "aws_security_group" "banco" {
   }
 }
 
-resource "random_password" "banco" {
-  length  = 24
-  special = false
-}
-
 resource "aws_db_parameter_group" "this" {
   name   = local.nome_completo
   family = "postgres16"
@@ -60,7 +55,7 @@ resource "aws_db_instance" "this" {
 
   db_name  = var.db_name
   username = var.db_username
-  password = random_password.banco.result
+  password = var.db_password
 
   allocated_storage = var.db_allocated_storage
   storage_type      = "gp3"
@@ -112,7 +107,7 @@ resource "aws_ssm_parameter" "db_username" {
 resource "aws_ssm_parameter" "db_password" {
   name  = "/${var.project}/${var.ambiente}/${var.nome}/db/password"
   type  = "SecureString"
-  value = random_password.banco.result
+  value = var.db_password
 }
 
 resource "aws_ssm_parameter" "db_url" {

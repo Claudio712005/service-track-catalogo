@@ -53,8 +53,29 @@ variable "db_name" {
 }
 
 variable "db_username" {
-  type    = string
-  default = "st_cat_user"
+  description = "Usuario mestre do banco. Vem do secret ST_CAT_DB_USER da esteira; sem default de proposito."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9_]{2,62}$", var.db_username))
+    error_message = "db_username deve comecar por letra minuscula e usar apenas minusculas, digitos e sublinhado."
+  }
+}
+
+variable "db_password" {
+  description = "Senha do usuario mestre. Vem do secret ST_CAT_DB_PASSWORD da esteira; sem default de proposito."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.db_password) >= 16 && length(var.db_password) <= 128
+    error_message = "db_password deve ter de 16 a 128 caracteres."
+  }
+
+  validation {
+    condition     = !can(regex("[/@\"' ]", var.db_password))
+    error_message = "O RDS recusa barra, arroba, aspas simples, aspas duplas e espaco na senha do usuario mestre."
+  }
 }
 
 variable "db_max_connections" {
