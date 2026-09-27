@@ -269,19 +269,3 @@ class SaldoDeInsumo private constructor(
         )
     }
 }
-
-data class ResultadoDeReserva(
-    val reserva: Reserva,
-    val movimento: MovimentoDeEstoque,
-)
-
-class SaldoInsuficienteException(
-    val insumoId: DomainId,
-    val solicitado: BigDecimal,
-    val disponivel: BigDecimal,
-    unidade: UnidadeDeMedida,
-) : DomainException(
-    "Saldo insuficiente do insumo ${insumoId.value}: solicitado " +
-        "${solicitado.stripTrailingZeros().toPlainString()} ${unidade.simbolo}, " +
-        "disponível ${disponivel.stripTrailingZeros().toPlainString()} ${unidade.simbolo}"
-)

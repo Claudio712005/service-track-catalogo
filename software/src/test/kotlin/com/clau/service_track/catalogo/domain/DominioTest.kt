@@ -1,6 +1,5 @@
 package com.clau.service_track.catalogo.domain
 
-import com.clau.service_track.catalogo.domain.exception.ConflitoDeEstadoException
 import com.clau.service_track.catalogo.domain.exception.DomainException
 import com.clau.service_track.catalogo.domain.model.CategoriaDeInsumo
 import com.clau.service_track.catalogo.domain.model.Insumo
