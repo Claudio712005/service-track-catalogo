@@ -4,6 +4,37 @@ spring:
   threads:
     virtual:
       enabled: true
+  datasource:
+    url: ${ST_CAT_DB_URL}
+    username: ${ST_CAT_DB_USER}
+    password: ${ST_CAT_DB_PASSWORD}
+    hikari:
+      pool-name: st-cat-pool
+      maximum-pool-size: ${ST_CAT_DB_POOL_MAX:10}
+      minimum-idle: ${ST_CAT_DB_POOL_MIN:2}
+      connection-timeout: 3000
+      validation-timeout: 2000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  mongodb:
+    uri: ${ST_INS_MONGO_URI}
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:catalogo},%X{correlationId:-},%X{transactionId:-}] "
+  level:
+    root: INFO
+    com.clau.service_track.catalogo: INFO
+    org.mongodb.driver.client: WARN
+    org.mongodb.driver.cluster: WARN
+    org.mongodb.driver.connection: WARN
+    org.hibernate.SQL: WARN
 
 servicetrack:
   security:
@@ -28,10 +59,18 @@ spring:
   config:
     activate:
       on-profile: dev
+  datasource:
+    url: ${ST_CAT_DB_URL:jdbc:postgresql://localhost:5432/st_cat}
+    username: ${ST_CAT_DB_USER:st_cat_user}
+    password: ${ST_CAT_DB_PASSWORD:st_cat_local}
   mongodb:
-    uri: mongodb://localhost:27017/catalogo?serverSelectionTimeoutMS=2000&connectTimeoutMS=2000
+    uri: ${ST_INS_MONGO_URI:mongodb://localhost:27017/ST_INS?serverSelectionTimeoutMS=2000&connectTimeoutMS=2000}
 
 servicetrack:
   security:
     jwt:
       habilitado: false
+
+logging:
+  level:
+    com.clau.service_track.catalogo: DEBUG
