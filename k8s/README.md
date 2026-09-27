@@ -51,14 +51,17 @@ que são descartáveis por definição.
 
 ```
 1. rede e EKS            (service-track-aws-iac)
-2. infra/terraform       (deste repo: ECR + RDS + SSM)
-3. criar-secret-do-banco.sh <ambiente>
-4. ArgoCD sincroniza     (Mongo efêmero e app sobem; app falha enquanto o schema não existe)
-5. aplicar-baseline.sh <ambiente>
+2. esteira Infra         (deste repo: ECR + RDS + SSM, e ela chama a esteira Banco)
+3. esteira Banco         (segredo do banco, baseline do Postgres e do Mongo, restart da app)
+4. esteira CD            (imagem no ECR + PR com a nova tag)
+5. merge do PR           (ArgoCD sincroniza o overlay do ambiente)
 ```
 
-O passo 5 é o que faz os pods pararem de reiniciar: sem Flyway, `ddl-auto: validate` recusa um
-banco vazio. É esperado ver `CrashLoopBackOff` entre 4 e 5 — não é defeito de manifesto.
+Sem Flyway, `ddl-auto: validate` recusa banco vazio: é esperado ver `CrashLoopBackOff` até o
+passo 3 ter rodado com o cluster de pé. Não é defeito de manifesto.
+
+A esteira Banco é idempotente e pode ser reexecutada a qualquer momento — inclusive depois do
+passo 5, que é quando o pod do Mongo costuma existir pela primeira vez.
 
 ## Como este serviço chega em hml e prd
 

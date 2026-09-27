@@ -15,15 +15,28 @@ State no mesmo bucket da plataforma, chave própria:
 
 ## Subir
 
+O caminho normal é a esteira **Infra** (`Actions -> Infra -> apply`, env `hml`): ela confere os
+secrets, confere que a rede existe, aplica o Terraform e chama a esteira **Banco** em seguida.
+
+Na mão, quando precisar:
+
 ```bash
 cd infra/terraform
 terraform init -backend-config=backend/hml.hcl -reconfigure
+export TF_VAR_db_username=st_cat_user
+export TF_VAR_db_password='...'          # 16 a 128 caracteres, sem / @ " \' nem espaco
 terraform apply -var ambiente=hml
 ```
 
-Para `prd`, trocar `hml` por `prd` nas duas linhas.
+Para `prd`, trocar `hml` por `prd` nas duas primeiras linhas.
+
+As duas variáveis **não têm default**: sem elas o Terraform para antes de tocar na AWS. É
+deliberado, e está registrado em [`CAT-ADR-001`](../docs/adr/CAT-ADR-001-credencial-do-banco-por-secret-da-esteira.md).
 
 ## Destruir
+
+Pela esteira: `Actions -> Infra -> destroy`, env `hml`. Na mão, exportando as mesmas duas
+variáveis do `apply`:
 
 ```bash
 terraform destroy -var ambiente=hml
@@ -81,16 +94,37 @@ A senha é gerada pelo Terraform e publicada como `SecureString`. Ela fica no st
 segredo entregue por Terraform — é a mesma exposição estrutural registrada em `I-16` no
 workspace, não uma novidade deste repositório.
 
-## O schema não é aplicado por este apply
+## Credencial do banco
+
+Usuário e senha vêm dos secrets `ST_CAT_DB_USER` e `ST_CAT_DB_PASSWORD` do *environment* do
+GitHub, um par por ambiente. O Terraform publica os dois no SSM, que continua sendo a fonte
+lida em tempo de uso.
+
+Consequência boa: a credencial **sobrevive** ao ciclo destruir–recriar, então o Secret do
+Kubernetes e o `psql` do ritual continuam valendo. Consequência a saber: trocar o **usuário**
+recria a instância; trocar a **senha** muda em lugar.
+
+## O schema não é aplicado pelo Terraform
 
 Não há Flyway neste serviço. Depois do `apply`, o banco está vazio e a aplicação sobe em
-falha, porque `ddl-auto` é `validate`. Aplicar o baseline é passo do ritual de ambiente:
+falha, porque `ddl-auto` é `validate`. Quem aplica o schema é a esteira **Banco**, que a
+esteira **Infra** chama no fim de um `apply` — e que você também roda sozinha
+(`Actions -> Banco`) quantas vezes quiser.
+
+Ela faz três coisas, todas idempotentes:
+
+1. cria o Secret `service-track-catalogo-db` no cluster a partir do SSM;
+2. aplica `db/postgres/*.sql` e `db/mongo/*.js` **de dentro do cluster**, porque o RDS é
+   privado e nenhum runner do GitHub alcança ele;
+3. reinicia o Deployment para a aplicação revalidar o schema.
+
+Se o cluster ainda não existir, ela avisa e sai sem erro: o RDS pode nascer antes do EKS, mas
+o baseline não. Se o pod do Mongo ainda não existir (ArgoCD não sincronizou), o Postgres é
+aplicado e o Mongo fica avisado para a próxima execução.
+
+Na mão, o mesmo caminho:
 
 ```bash
 scripts/criar-secret-do-banco.sh hml
 scripts/aplicar-baseline.sh hml
 ```
-
-O primeiro cria o Secret do Kubernetes a partir do SSM; o segundo aplica
-`db/postgres/*.sql` e `db/mongo/*.js` de dentro do cluster. Os dois são idempotentes e
-podem ser repetidos sem efeito colateral.
