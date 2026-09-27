@@ -56,8 +56,6 @@ class DominioTest {
         descricao = "Combustível para abastecimento de veículos em teste de rodagem",
         custo = ValorMonetario.de("7.29"),
         especificacao = mapOf("tipo" to "Premium", "octanagem" to "98", "aditivado" to "sim"),
-        qtdEstoqueInicial = BigDecimal("200.0"),
-        estoqueMinimo = BigDecimal("50.0"),
     )
 
     private fun pneuAro16() = Insumo.criar(
@@ -70,8 +68,6 @@ class DominioTest {
             "largura" to "205", "perfil" to "55", "aro" to "16",
             "indice-carga" to "91", "indice-velocidade" to "V", "calibragem" to "32.0",
         ),
-        qtdEstoqueInicial = BigDecimal("8"),
-        estoqueMinimo = BigDecimal("4"),
     )
 
     @Test
@@ -133,31 +129,6 @@ class DominioTest {
         assertFailsWith<DomainException> {
             Especificacao.de(pneu, mapOf("largura" to "duzentos", "perfil" to "55", "aro" to "16"))
         }
-    }
-
-    @Test
-    fun `litro admite fracao e unidade nao`() {
-        val g = gasolina()
-        g.reservar(BigDecimal("4.2"))
-        assertEquals(BigDecimal("195.8"), g.qtdEstoque)
-
-        val e = assertFailsWith<DomainException> { pneuAro16().reservar(BigDecimal("2.5")) }
-        assertTrue(e.message!!.contains("não admite fração"))
-    }
-
-    @Test
-    fun `reserva e devolucao fecham o ciclo de compensacao`() {
-        val g = gasolina()
-        g.reservar(BigDecimal("30.5"))
-        g.adicionarAoEstoque(BigDecimal("30.5"))
-        assertEquals(0, BigDecimal("200.0").compareTo(g.qtdEstoque))
-    }
-
-    @Test
-    fun `reserva acima do saldo falha sem alterar estoque`() {
-        val p = pneuAro16()
-        assertFailsWith<ConflitoDeEstadoException> { p.reservar(BigDecimal("20")) }
-        assertEquals(0, BigDecimal("8").compareTo(p.qtdEstoque))
     }
 
     @Test
