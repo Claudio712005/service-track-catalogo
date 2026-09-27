@@ -32,7 +32,7 @@ class GlobalExceptionHandler(
         requisicao: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
         val violacoes = e.bindingResult.fieldErrors.map {
-            ErrorResponse.Violacao(
+            Violacao(
                 campo = it.field,
                 mensagem = it.defaultMessage ?: "Valor inválido",
                 valorRejeitado = it.rejectedValue?.toString(),
@@ -53,7 +53,7 @@ class GlobalExceptionHandler(
         requisicao: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
         val violacoes = e.constraintViolations.map {
-            ErrorResponse.Violacao(
+            Violacao(
                 campo = it.propertyPath.toString().substringAfterLast('.'),
                 mensagem = it.message,
                 valorRejeitado = it.invalidValue?.toString(),
@@ -100,7 +100,7 @@ class GlobalExceptionHandler(
         mensagem = "Parâmetro '${e.name}' não aceita o valor informado",
         requisicao = requisicao,
         violacoes = listOf(
-            ErrorResponse.Violacao(
+            Violacao(
                 campo = e.name,
                 mensagem = "Tipo esperado: ${e.requiredType?.simpleName ?: "desconhecido"}",
                 valorRejeitado = e.value?.toString(),

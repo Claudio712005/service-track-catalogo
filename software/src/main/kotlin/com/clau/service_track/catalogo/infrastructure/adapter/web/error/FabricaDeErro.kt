@@ -15,7 +15,7 @@ class FabricaDeErro {
         codigo: CodigoErro,
         mensagem: String,
         requisicao: HttpServletRequest,
-        violacoes: List<ErrorResponse.Violacao>? = null,
+        violacoes: List<Violacao>? = null,
     ): ResponseEntity<ErrorResponse> = ResponseEntity.status(status).body(
         ErrorResponse(
             timestamp = OffsetDateTime.now(),
