@@ -51,6 +51,7 @@ class DominioTest {
 
     private fun gasolina() = Insumo.criar(
         categoria = combustivel,
+        sku = "COMB-GAS-PREM",
         nome = "Gasolina Premium",
         descricao = "Combustível para abastecimento de veículos em teste de rodagem",
         custo = ValorMonetario.de("7.29"),
@@ -61,6 +62,7 @@ class DominioTest {
 
     private fun pneuAro16() = Insumo.criar(
         categoria = pneu,
+        sku = "PNEU-205-55-R16",
         nome = "Pneu 205/55 R16",
         descricao = "Pneu radial para automóvel de passeio",
         custo = ValorMonetario.de("459.90"),
@@ -99,7 +101,7 @@ class DominioTest {
     fun `atributo fora da categoria e recusado`() {
         val e = assertFailsWith<DomainException> {
             Insumo.criar(
-                categoria = pneu, nome = "Pneu", descricao = "x", custo = ValorMonetario.de("1.00"),
+                categoria = pneu, sku = "PNEU-TESTE-1", nome = "Pneu", descricao = "x", custo = ValorMonetario.de("1.00"),
                 especificacao = mapOf("largura" to "205", "perfil" to "55", "aro" to "16", "viscosidade" to "5W30"),
             )
         }
@@ -110,7 +112,7 @@ class DominioTest {
     fun `atributo obrigatorio ausente e recusado`() {
         val e = assertFailsWith<DomainException> {
             Insumo.criar(
-                categoria = pneu, nome = "Pneu", descricao = "x", custo = ValorMonetario.de("1.00"),
+                categoria = pneu, sku = "PNEU-TESTE-2", nome = "Pneu", descricao = "x", custo = ValorMonetario.de("1.00"),
                 especificacao = mapOf("largura" to "205"),
             )
         }
