@@ -1,6 +1,9 @@
 package com.clau.service_track.catalogo.infrastructure.adapter.config
 
+import com.clau.service_track.catalogo.infrastructure.adapter.web.filter.CorrelacaoFilter
 import io.swagger.v3.oas.models.Components
+import io.swagger.v3.oas.models.parameters.Parameter
+import io.swagger.v3.oas.models.media.StringSchema
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.security.SecurityRequirement
@@ -25,9 +28,10 @@ class OpenApiConfig(
                 .title("ServiceTrack — Catálogo")
                 .version("1")
                 .description(
-                    "Catálogo de serviços e gestão de estoque de insumos da oficina. " +
-                        "Fonte canônica de nome, valor de referência e saldo disponível para " +
-                        "composição de orçamentos pelo serviço de ordens de serviço." +
+                    "Catálogo de serviços e de insumos da oficina. Fonte canônica de nome, " +
+                        "valor de referência, características técnicas e custo de tabela para " +
+                        "composição de orçamentos pelo serviço de ordens de serviço. " +
+                        "Saldo de estoque não é publicado por esta versão." +
                         if (autenticacaoHabilitada) "" else
                             "\n\nATENÇÃO: esta instância está com a validação de token desligada. " +
                                 "Configuração exclusiva de desenvolvimento local."
@@ -58,6 +62,25 @@ class OpenApiConfig(
         if (autenticacaoHabilitada) {
             operacao.addSecurityItem(SecurityRequirement().addList(ESQUEMA_BEARER))
         }
+        operacao
+    }
+
+    @Bean
+    fun documentarCorrelacao(): OperationCustomizer = OperationCustomizer { operacao, _ ->
+        operacao.addParametersItem(
+            Parameter()
+                .`in`("header")
+                .name(CorrelacaoFilter.CABECALHO_CORRELACAO)
+                .required(false)
+                .schema(StringSchema())
+                .description(
+                    "Identificador de correlação da operação de negócio, propagado entre serviços. " +
+                        "Informe o mesmo valor em todas as chamadas do fluxo para que o rastreamento " +
+                        "as agrupe; omitido, o servidor gera um. É devolvido no cabeçalho de resposta " +
+                        "de mesmo nome, ao lado de " + CorrelacaoFilter.CABECALHO_TRANSACAO +
+                        ", que identifica esta requisição isolada."
+                )
+        )
         operacao
     }
 
