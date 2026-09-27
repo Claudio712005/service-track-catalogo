@@ -37,4 +37,6 @@ interface OutboxJpaRepository : JpaRepository<OutboxEntity, UUID> {
         nativeQuery = true,
     )
     fun reservarPendentes(maximo: Int): List<OutboxEntity>
+
+    fun countByDataPublicacaoIsNull(): Long
 }

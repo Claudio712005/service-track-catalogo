@@ -27,6 +27,7 @@ class ConsumidorDeComandosDeEstoque(
     private val consumir: ConsumirReservaUseCase,
     private val liberar: LiberarReservaUseCase,
     private val registrarEntrada: RegistrarEntradaUseCase,
+    private val metricas: MetricasDeEstoque,
 ) {
 
     private val log = LoggerFactory.getLogger(ConsumidorDeComandosDeEstoque::class.java)
@@ -44,24 +45,34 @@ class ConsumidorDeComandosDeEstoque(
                 "comando recebido tipo={} versao={} particao={} offset={}",
                 envelope.tipo, envelope.versao, registro.partition(), registro.offset(),
             )
-            despachar(envelope)
+            metricas.comandoProcessado(envelope.tipo, despachar(envelope))
+        } catch (e: MensagemInvalidaException) {
+            metricas.comandoProcessado(tipoConhecido(envelope.tipo), INVALIDO)
+            throw e
+        } catch (e: Exception) {
+            metricas.comandoProcessado(tipoConhecido(envelope.tipo), ERRO)
+            throw e
         } finally {
             MDC.remove(CorrelacaoFilter.CHAVE_CORRELACAO)
             MDC.remove(CorrelacaoFilter.CHAVE_TRANSACAO)
         }
     }
 
-    private fun despachar(envelope: EnvelopeDeMensagem) {
-        when (envelope.tipo) {
-            RESERVAR -> reservar.executar(paraReserva(envelope))
-            CONSUMIR -> consumir.executar(paraConsumo(envelope))
-            LIBERAR -> liberar.executar(paraLiberacao(envelope))
-            ENTRADA -> registrarEntrada.executar(paraEntrada(envelope))
-            else -> throw MensagemInvalidaException(
-                "Comando '${envelope.tipo}' não é reconhecido por este serviço"
-            )
+    private fun despachar(envelope: EnvelopeDeMensagem): String = when (envelope.tipo) {
+        RESERVAR -> reservar.executar(paraReserva(envelope)).situacao.name.lowercase()
+        CONSUMIR -> consumir.executar(paraConsumo(envelope)).situacao.name.lowercase()
+        LIBERAR -> liberar.executar(paraLiberacao(envelope)).situacao.name.lowercase()
+        ENTRADA -> {
+            registrarEntrada.executar(paraEntrada(envelope))
+            APLICADO
         }
+
+        else -> throw MensagemInvalidaException(
+            "Comando '${envelope.tipo}' não é reconhecido por este serviço"
+        )
     }
+
+    private fun tipoConhecido(tipo: String): String = if (tipo in TIPOS) tipo else DESCONHECIDO
 
     private fun paraReserva(envelope: EnvelopeDeMensagem): ReservarEstoqueCommand {
         val dados = leitor.dados(envelope, DadosDeReservarEstoque::class.java)
@@ -121,5 +132,10 @@ class ConsumidorDeComandosDeEstoque(
         const val CONSUMIR = "ConsumirReserva"
         const val LIBERAR = "LiberarReserva"
         const val ENTRADA = "RegistrarEntradaDeEstoque"
+        const val APLICADO = "aplicado"
+        const val INVALIDO = "invalido"
+        const val ERRO = "erro"
+        const val DESCONHECIDO = "desconhecido"
+        val TIPOS = setOf(RESERVAR, CONSUMIR, LIBERAR, ENTRADA)
     }
 }

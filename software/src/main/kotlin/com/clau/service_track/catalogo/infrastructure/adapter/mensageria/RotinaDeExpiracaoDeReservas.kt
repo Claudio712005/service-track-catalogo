@@ -14,7 +14,12 @@ import org.springframework.stereotype.Component
 class RotinaDeExpiracaoDeReservas(
     private val expirar: ExpirarReservasUseCase,
     private val propriedades: PropriedadesDeMensageria,
+    private val metricas: MetricasDeEstoque,
 ) {
 
-    fun expirarVencidas(): Int = expirar.executar(ExpirarReservasCommand(propriedades.expiracaoDeReservas.lote))
+    fun expirarVencidas(): Int {
+        val expiradas = expirar.executar(ExpirarReservasCommand(propriedades.expiracaoDeReservas.lote))
+        metricas.reservasExpiradas(expiradas)
+        return expiradas
+    }
 }

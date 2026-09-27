@@ -7,6 +7,7 @@ import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.Lib
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.RegistrarEntradaUseCase
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueUseCase
 import com.clau.service_track.catalogo.domain.vo.DomainId
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
@@ -55,6 +56,7 @@ class ConsumidorDeComandosDeEstoqueTest {
             consumir = consumirReserva,
             liberar = liberar,
             registrarEntrada = registrarEntrada,
+            metricas = MetricasDeEstoque(SimpleMeterRegistry()) { 0L },
         )
     }
 

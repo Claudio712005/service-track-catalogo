@@ -22,6 +22,7 @@ class PublicadorDeOutbox(
     private val template: KafkaTemplate<String, String>,
     private val propriedades: PropriedadesDeMensageria,
     private val mapper: ObjectMapper,
+    private val metricas: MetricasDeEstoque,
 ) {
 
     private val log = LoggerFactory.getLogger(PublicadorDeOutbox::class.java)
@@ -32,6 +33,7 @@ class PublicadorDeOutbox(
         if (pendentes.isEmpty()) return 0
 
         pendentes.forEach(::enviar)
+        metricas.eventosPublicados(pendentes.size)
         log.info("eventos publicados quantidade={} topico={}", pendentes.size, propriedades.topicoDeEventos)
         return pendentes.size
     }

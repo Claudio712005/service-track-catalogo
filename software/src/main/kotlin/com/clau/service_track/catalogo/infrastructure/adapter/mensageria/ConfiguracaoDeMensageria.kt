@@ -2,6 +2,8 @@ package com.clau.service_track.catalogo.infrastructure.adapter.mensageria
 
 import com.clau.service_track.catalogo.application.exception.RecursoNaoEncontradoException
 import com.clau.service_track.catalogo.domain.exception.DomainException
+import com.clau.service_track.catalogo.infrastructure.adapter.out.repository.postgres.OutboxJpaRepository
+import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.common.TopicPartition
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -38,6 +40,10 @@ class ConfiguracaoDeMensageria {
         fabrica.containerProperties.isObservationEnabled = true
         return fabrica
     }
+
+    @Bean
+    fun metricasDeEstoque(registro: MeterRegistry, outbox: OutboxJpaRepository) =
+        MetricasDeEstoque(registro) { outbox.countByDataPublicacaoIsNull() }
 
     @Bean
     fun publicadorDaDlt(
