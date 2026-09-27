@@ -1,3 +1,9 @@
 .idea/
 *.iml
 .DS_Store
+
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan

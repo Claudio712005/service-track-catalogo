@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-track-catalogo-mongo
+  labels:
+    app: service-track-catalogo-mongo
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: service-track-catalogo-mongo
+  template:
+    metadata:
+      labels:
+        app: service-track-catalogo-mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7
+          args: ["--bind_ip_all"]
+          ports:
+            - containerPort: 27017
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: dados
+              mountPath: /data/db
+      volumes:
+        - name: dados
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-track-catalogo-mongo
+  labels:
+    app: service-track-catalogo-mongo
+spec:
+  type: ClusterIP
+  selector:
+    app: service-track-catalogo-mongo
+  ports:
+    - name: mongo
+      port: 27017
+      targetPort: 27017
