@@ -103,7 +103,21 @@ services:
       ST_INS_MONGO_URI: mongodb://mongo:27017/ST_INS
       SERVICETRACK_MENSAGERIA_HABILITADA: "true"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      OTEL_JAVAAGENT_ENABLED: "false"
+      OTEL_JAVAAGENT_ENABLED: "true"
+      OTEL_SERVICE_NAME: service-track-catalogo
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=servicetrack,deployment.environment=local
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: http://loki:3100/otlp/v1/logs
+      OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: http/protobuf
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_LOG_ATTRIBUTES: "true"
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: "*"
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus,metrics
     ports:
       - "8080:8080"
     healthcheck:
@@ -113,7 +127,106 @@ services:
       retries: 30
       start_period: 30s
 
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: st-cat-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=6h
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observabilidade/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: st-cat-tempo
+    user: "0:0"
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./observabilidade/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo:/var/tempo
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3200/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: st-cat-loki
+    user: "0:0"
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observabilidade/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki:/loki
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: st-cat-grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: dark
+      GF_LOG_LEVEL: warn
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlStreaming
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/catalogo-visao-geral.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observabilidade/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observabilidade/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  alertas:
+    image: mendhak/http-https-echo:35
+    container_name: st-cat-alertas
+    environment:
+      HTTP_PORT: 8080
+      DISABLE_REQUEST_LOGS: "false"
+    ports:
+      - "8088:8080"
+
 volumes:
   postgres:
   mongo:
   kafka:
+  prometheus:
+  tempo:
+  loki:
+  grafana:
