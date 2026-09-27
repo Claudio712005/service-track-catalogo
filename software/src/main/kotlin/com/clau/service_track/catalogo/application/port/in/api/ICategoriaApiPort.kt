@@ -1,5 +1,6 @@
 package com.clau.service_track.catalogo.application.port.`in`.api
 
+import com.clau.service_track.catalogo.application.port.`in`.api.dto.AtivacaoDeCategoriaRequest
 import com.clau.service_track.catalogo.application.port.`in`.api.dto.CategoriaResponse
 import com.clau.service_track.catalogo.application.port.`in`.api.dto.CriarCategoriaRequest
 import com.clau.service_track.catalogo.application.port.`in`.api.dto.DefinicaoDeAtributoRequest
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -36,8 +38,9 @@ interface ICategoriaApiPort {
     @Operation(
         operationId = "listarCategorias",
         summary = "Lista as categorias de insumo",
-        description = "Retorna todas as categorias, ordenadas por nome, cada uma com os atributos " +
-            "que declara. O conjunto é pequeno por natureza e não é paginado."
+        description = "Retorna as categorias ativas, ordenadas por nome, cada uma com os atributos " +
+            "que declara. O conjunto é pequeno por natureza e não é paginado. Categorias " +
+            "desativadas só aparecem com incluirDesativadas=true."
     )
     @ApiResponse(
         responseCode = "200",
@@ -108,6 +111,12 @@ interface ICategoriaApiPort {
         )
         @RequestParam(name = "termo", required = false)
         termo: String?,
+        @Parameter(
+            description = "Inclui na resposta as categorias desativadas. Padrão false.",
+            example = "false"
+        )
+        @RequestParam(name = "incluirDesativadas", required = false, defaultValue = "false")
+        incluirDesativadas: Boolean,
     ): List<CategoriaResponse>
 
     @GetMapping(path = ["/{id}"], produces = [MediaType.APPLICATION_JSON_VALUE])
@@ -279,5 +288,83 @@ interface ICategoriaApiPort {
         @Parameter(description = "Identificador da categoria.", example = "018f2c9a-5f2e-7c31-9a41-6f3b2d0e9c11", required = true)
         @PathVariable id: String,
         @Valid @RequestBody requisicao: DefinicaoDeAtributoRequest,
+    ): CategoriaResponse
+
+    @PutMapping(
+        path = ["/{id}/ativacao"],
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    @Operation(
+        operationId = "alternarAtivacaoDaCategoria",
+        summary = "Desativa ou reativa a categoria",
+        description = "Categoria não é apagada, é desligada. Enquanto desativada: não aceita " +
+            "insumo novo, não recebe atributo novo, sai da listagem de categorias e **os seus " +
+            "insumos saem da listagem padrão de insumos**. Nada é perdido — insumo da categoria " +
+            "desativada continua consultável por identificador e por SKU, e volta à listagem " +
+            "quando a categoria é reativada. Cadastrar uma categoria com código já usado por " +
+            "uma categoria desativada é recusado com 409 apontando este endpoint."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Estado alterado. A resposta traz a categoria completa com o novo estado.",
+        content = [
+            Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = Schema(implementation = CategoriaResponse::class),
+                examples = [
+                    ExampleObject(
+                        name = "Categoria desativada",
+                        value = """
+                        {
+                          "id": "018f2c9a-5f2e-7c31-9a41-6f3b2d0e9c11",
+                          "codigo": "OLEO_MOTOR",
+                          "nome": "Óleo de motor",
+                          "unidadePadrao": "LITRO",
+                          "unidadeFracionavel": true,
+                          "ativa": false,
+                          "atributos": []
+                        }
+                        """
+                    )
+                ]
+            )
+        ]
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Nenhuma categoria com esse identificador.",
+        content = [Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = Schema(implementation = ErrorResponse::class))]
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "A categoria já está no estado pedido.",
+        content = [
+            Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = Schema(implementation = ErrorResponse::class),
+                examples = [
+                    ExampleObject(
+                        name = "Já desativada",
+                        value = """
+                        {
+                          "timestamp": "2026-09-27T09:41:18.204-03:00",
+                          "status": 409,
+                          "error": "Conflict",
+                          "code": "CONFLITO_DE_ESTADO",
+                          "message": "Categoria 'Óleo de motor' já está desativada",
+                          "path": "/categorias/018f2c9a-5f2e-7c31-9a41-6f3b2d0e9c11/ativacao",
+                          "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+                        }
+                        """
+                    )
+                ]
+            )
+        ]
+    )
+    fun alternarAtivacao(
+        @Parameter(description = "Identificador da categoria.", example = "018f2c9a-5f2e-7c31-9a41-6f3b2d0e9c11", required = true)
+        @PathVariable id: String,
+        @Valid @RequestBody requisicao: AtivacaoDeCategoriaRequest,
     ): CategoriaResponse
 }

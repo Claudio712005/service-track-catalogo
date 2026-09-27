@@ -1,10 +1,12 @@
 package com.clau.service_track.catalogo.infrastructure.adapter.`in`.mapper
 
+import com.clau.service_track.catalogo.application.port.`in`.api.dto.AtivacaoDeCategoriaRequest
 import com.clau.service_track.catalogo.application.port.`in`.api.dto.CategoriaResponse
 import com.clau.service_track.catalogo.application.port.`in`.api.dto.CriarCategoriaRequest
 import com.clau.service_track.catalogo.application.port.`in`.api.dto.DefinicaoDeAtributoRequest
 import com.clau.service_track.catalogo.application.port.`in`.api.dto.DefinicaoDeAtributoResponse
 import com.clau.service_track.catalogo.application.port.`in`.useCase.categoria.AcrescentarAtributoCommand
+import com.clau.service_track.catalogo.application.port.`in`.useCase.categoria.AlternarCategoriaCommand
 import com.clau.service_track.catalogo.application.port.`in`.useCase.categoria.CriarCategoriaCommand
 import com.clau.service_track.catalogo.domain.exception.DomainException
 import com.clau.service_track.catalogo.domain.model.CategoriaDeInsumo
@@ -67,6 +69,7 @@ class CategoriaWebMapper {
         nome = categoria.nome,
         unidadePadrao = categoria.unidadePadrao.name,
         unidadeFracionavel = categoria.unidadePadrao.fracionavel,
+        ativa = categoria.ativa,
         atributos = categoria.atributos.map {
             DefinicaoDeAtributoResponse(
                 chave = it.chave,
@@ -77,6 +80,11 @@ class CategoriaWebMapper {
                 opcoes = it.opcoes,
             )
         },
+    )
+
+    fun paraComando(id: String, requisicao: AtivacaoDeCategoriaRequest) = AlternarCategoriaCommand(
+        id = paraIdentificador(id),
+        ativa = requisicao.ativa,
     )
 
     fun paraResposta(categorias: List<CategoriaDeInsumo>) = categorias.map(::paraResposta)

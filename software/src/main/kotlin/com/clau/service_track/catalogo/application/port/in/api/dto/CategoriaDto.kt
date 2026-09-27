@@ -85,6 +85,28 @@ data class CategoriaResponse(
     )
     val unidadeFracionavel: Boolean,
 
+    @get:Schema(
+        description = "Se a categoria está ativa. Categoria desativada não aceita insumo novo, " +
+            "não recebe atributo novo e os seus insumos saem da listagem padrão de insumos.",
+        example = "true"
+    )
+    val ativa: Boolean,
+
     @get:Schema(description = "Atributos declarados, na ordem de cadastro.")
     val atributos: List<DefinicaoDeAtributoResponse>,
+)
+
+@Schema(
+    name = "AtivacaoDeCategoriaRequest",
+    description = "Liga ou desliga a categoria. Desativar preserva o histórico: os insumos " +
+        "continuam existindo e consultáveis por identificador, apenas saem da listagem padrão."
+)
+data class AtivacaoDeCategoriaRequest(
+
+    @get:Schema(
+        description = "true reativa a categoria, false desativa.",
+        example = "false",
+        requiredMode = Schema.RequiredMode.REQUIRED
+    )
+    val ativa: Boolean,
 )
