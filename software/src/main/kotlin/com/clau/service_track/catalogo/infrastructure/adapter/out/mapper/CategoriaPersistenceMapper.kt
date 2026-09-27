@@ -19,6 +19,7 @@ class CategoriaPersistenceMapper {
             codigo = categoria.codigo,
             nome = categoria.nome,
             unidadePadrao = categoria.unidadePadrao,
+            ativa = categoria.ativa,
             atributos = categoria.atributos.map {
                 DefinicaoDeAtributoDocumento(
                     chave = it.chave,
@@ -40,6 +41,7 @@ class CategoriaPersistenceMapper {
         codigo = documento.codigo,
         nome = documento.nome,
         unidadePadrao = documento.unidadePadrao,
+        ativa = documento.ativa,
         atributos = documento.atributos.map {
             DefinicaoDeAtributo(
                 chave = it.chave,

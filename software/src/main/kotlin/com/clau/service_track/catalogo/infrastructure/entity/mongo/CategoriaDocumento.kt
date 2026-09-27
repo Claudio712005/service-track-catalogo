@@ -21,6 +21,9 @@ class CategoriaDocumento(
     @Field("UNIDADE_PADRAO")
     var unidadePadrao: UnidadeDeMedida,
 
+    @Field("ATIVA")
+    var ativa: Boolean = true,
+
     @Field("ATRIBUTOS")
     var atributos: MutableList<DefinicaoDeAtributoDocumento> = mutableListOf(),
 
