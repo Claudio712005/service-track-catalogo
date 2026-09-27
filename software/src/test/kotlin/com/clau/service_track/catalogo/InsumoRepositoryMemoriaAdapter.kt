@@ -15,7 +15,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 @Repository
 @Profile("teste")
-class InsumoRepositoryMemoriaAdapter : InsumoRepositoryPort {
+class InsumoRepositoryMemoriaAdapter(
+    private val categorias: CategoriaRepositoryMemoriaAdapter,
+) : InsumoRepositoryPort {
 
     private val acervo = ConcurrentHashMap<String, Insumo>()
 
@@ -41,8 +43,12 @@ class InsumoRepositoryMemoriaAdapter : InsumoRepositoryPort {
     override fun buscarPorCodigoBarras(codigoBarras: String): Insumo? = acervo.values
         .firstOrNull { it.codigoBarras == codigoBarras.trim() }
 
-    override fun listar(filtro: FiltroDeInsumo): List<Insumo> = acervo.values
+    override fun listar(filtro: FiltroDeInsumo): List<Insumo> {
+        val desativadas = if (filtro.incluirInativos) emptySet() else categorias.desativadas()
+
+        return acervo.values
         .filter { filtro.incluirInativos || it.ativo }
+        .filter { filtro.incluirInativos || it.categoriaId !in desativadas }
         .filter { filtro.categoriaId == null || it.categoriaId == filtro.categoriaId }
         .filter { insumo ->
             val termo = filtro.termo ?: return@filter true
@@ -51,6 +57,7 @@ class InsumoRepositoryMemoriaAdapter : InsumoRepositoryPort {
                 (insumo.marca?.contains(termo, ignoreCase = true) ?: false)
         }
         .toList()
+    }
 
     override fun existeComSku(sku: String): Boolean = buscarPorSku(sku) != null
 

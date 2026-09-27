@@ -8,4 +8,5 @@ fun interface ListarCategoriasUseCase {
 
 data class ListarCategoriasQuery(
     val termo: String? = null,
+    val incluirDesativadas: Boolean = false,
 )

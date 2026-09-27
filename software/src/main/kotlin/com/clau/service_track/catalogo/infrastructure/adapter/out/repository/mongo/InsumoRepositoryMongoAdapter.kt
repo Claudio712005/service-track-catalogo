@@ -50,6 +50,9 @@ class InsumoRepositoryMongoAdapter(
 
         if (!filtro.incluirInativos) {
             criterios += Criteria.where("ATIVO").`is`(true)
+            idsDeCategoriasDesativadas().takeIf { it.isNotEmpty() }?.let {
+                criterios += Criteria.where("CATEGORIA_ID").nin(it)
+            }
         }
         filtro.categoriaId?.let { criterios += Criteria.where("CATEGORIA_ID").`is`(it.value) }
         filtro.termo?.let { termo ->
@@ -81,6 +84,8 @@ class InsumoRepositoryMongoAdapter(
 
         return documentos.map { mapper.paraDominio(it, porId[it.categoriaId]) }
     }
+
+    private fun idsDeCategoriasDesativadas(): List<String> = categorias.findAllByAtiva(false).map { it.id }
 
     private fun categoriaDe(categoriaId: String): CategoriaDeInsumo? = categorias
         .findById(categoriaId)

@@ -9,6 +9,8 @@ interface CategoriaMongoRepository : MongoRepository<CategoriaDocumento, String>
 
     fun existsByCodigo(codigo: String): Boolean
 
+    fun findAllByAtiva(ativa: Boolean): List<CategoriaDocumento>
+
     fun findByCodigoContainingIgnoreCaseOrNomeContainingIgnoreCase(
         codigo: String,
         nome: String,

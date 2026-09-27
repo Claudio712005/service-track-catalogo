@@ -13,7 +13,7 @@ interface CategoriaRepositoryPort {
 
     fun buscarPorCodigo(codigo: String): CategoriaDeInsumo?
 
-    fun listar(termo: String?): List<CategoriaDeInsumo>
+    fun listar(termo: String?, incluirDesativadas: Boolean): List<CategoriaDeInsumo>
 
     fun existeComCodigo(codigo: String): Boolean
 }

@@ -20,5 +20,6 @@ class CategoriaQueryHandler(
             ?: throw RecursoNaoEncontradoException("Categoria", consulta.id.value)
 
     override fun executar(consulta: ListarCategoriasQuery): List<CategoriaDeInsumo> =
-        repositorio.listar(consulta.termo?.trim()?.ifBlank { null }).sortedWith(compareBy(OrdemDeExibicao.porNome()) { it.nome })
+        repositorio.listar(consulta.termo?.trim()?.ifBlank { null }, consulta.incluirDesativadas)
+            .sortedWith(compareBy(OrdemDeExibicao.porNome()) { it.nome })
 }
