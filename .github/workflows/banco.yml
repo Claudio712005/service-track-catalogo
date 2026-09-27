@@ -1,0 +1,116 @@
+name: Banco
+
+run-name: "Banco de ${{ inputs.env }} por @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Ambiente alvo"
+        required: true
+        type: choice
+        options: [hml, prd]
+        default: hml
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: banco-${{ inputs.env }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  NAMESPACE: service-track-catalogo
+
+jobs:
+
+  baseline:
+    name: "Segredo e baseline dos bancos"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Conferir pre-requisitos
+        id: prereq
+        run: |
+          ENV="${{ inputs.env }}"
+          CLUSTER="servicetrack-$ENV"
+
+          if ! aws ssm get-parameter --name "/servicetrack/$ENV/catalogo/db/endpoint" >/dev/null 2>&1; then
+            echo "::error::O RDS de $ENV nao existe. Rode antes a esteira Infra (acao=apply, env=$ENV)."
+            exit 1
+          fi
+
+          if ! aws eks describe-cluster --name "$CLUSTER" >/dev/null 2>&1; then
+            echo "::warning::O cluster $CLUSTER nao existe ainda."
+            echo "::warning::O RDS e privado: o baseline so roda de dentro do cluster. Suba o EKS pelo service-track-aws-iac e rode esta esteira de novo."
+            echo "pular=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "pular=false" >> "$GITHUB_OUTPUT"
+          echo "cluster=$CLUSTER" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar o kubeconfig
+        if: steps.prereq.outputs.pular == 'false'
+        run: aws eks update-kubeconfig --name "${{ steps.prereq.outputs.cluster }}" --region "$AWS_REGION"
+
+      - name: Criar o segredo do banco a partir do SSM
+        if: steps.prereq.outputs.pular == 'false'
+        run: bash scripts/criar-secret-do-banco.sh "${{ inputs.env }}"
+
+      - name: Aplicar o baseline do Postgres e do Mongo
+        if: steps.prereq.outputs.pular == 'false'
+        env:
+          MONGO_OPCIONAL: "1"
+          ESPERA_DO_MONGO: "180"
+        run: bash scripts/aplicar-baseline.sh "${{ inputs.env }}"
+
+      - name: Reiniciar a aplicacao para revalidar o schema
+        if: steps.prereq.outputs.pular == 'false'
+        run: |
+          if kubectl get deployment service-track-catalogo -n "$NAMESPACE" >/dev/null 2>&1; then
+            kubectl rollout restart deployment/service-track-catalogo -n "$NAMESPACE"
+            kubectl rollout status deployment/service-track-catalogo -n "$NAMESPACE" --timeout=300s || {
+              echo "::warning::A aplicacao nao ficou pronta em 5 minutos. Provavel imagem ainda em bootstrap no ECR."
+              kubectl get pods -n "$NAMESPACE"
+            }
+          else
+            echo "::notice::Deployment ainda nao existe. O ArgoCD cria quando o overlay de ${{ inputs.env }} for sincronizado."
+          fi
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "### Banco de \`${{ inputs.env }}\`"
+            echo ""
+            if [ "${{ steps.prereq.outputs.pular }}" = "true" ]; then
+              echo "Cluster ausente: baseline **nao** aplicado. Suba o EKS e rode esta esteira de novo."
+            else
+              echo "| Etapa | Estado |"
+              echo "|---|---|"
+              echo "| Segredo do banco no cluster | aplicado a partir do SSM |"
+              echo "| Baseline e seed do Postgres | aplicado de dentro do cluster |"
+              echo "| Baseline e seed do Mongo | aplicado se o pod existia |"
+              echo ""
+              echo "Os scripts sao idempotentes: rodar de novo nao duplica nada."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
