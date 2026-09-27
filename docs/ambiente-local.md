@@ -17,6 +17,11 @@ demora. As seguintes reaproveitam a imagem.
 | `postgres` | 5432 | `psql` direto, quando precisar olhar a razão de estoque |
 | `mongo` | 27017 | `mongosh`, para ver categoria e insumo |
 | `kafka` | 29092 | produzir comando e ler evento **do host** |
+| `grafana` | 3000 | painéis, alertas e os traces (`admin` / `admin`) |
+| `prometheus` | 9090 | métrica coletada da aplicação |
+| `tempo` | 3200 | traces |
+| `loki` | 3100 | log com o trace dentro |
+| `alertas` | 8088 | recebedor de webhook, para ver o alerta chegar |
 
 A porta do broker é **29092 no host** e `kafka:9092` dentro da rede do Compose. São dois
 listeners no mesmo broker: sem isso, o endereço anunciado serve a um dos dois lados e
@@ -62,7 +67,9 @@ docker compose exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh \
 ```
 
 O contrato das mensagens, com envelope e regras de idempotência, está em
-[`mensageria/README.md`](mensageria/README.md).
+[`mensageria/README.md`](mensageria/README.md). A pilha de observabilidade que sobe junto —
+painéis, alertas e a correlação entre métrica, trace e log — está em
+[`observabilidade.md`](observabilidade.md).
 
 ## Olhar o estado por dentro
 
