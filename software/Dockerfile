@@ -46,8 +46,17 @@ RUN mkdir -p /preparo/execucao \
 
 WORKDIR /preparo/execucao
 
-RUN java -XX:ArchiveClassesAtExit=/preparo/aplicacao.jsa \
+RUN env -u OTEL_EXPORTER_OTLP_ENDPOINT \
+        -u OTEL_EXPORTER_OTLP_PROTOCOL \
+        -u OTEL_EXPORTER_OTLP_TRACES_ENDPOINT \
+        -u OTEL_EXPORTER_OTLP_TRACES_PROTOCOL \
+        -u OTEL_EXPORTER_OTLP_LOGS_ENDPOINT \
+        -u OTEL_RESOURCE_ATTRIBUTES \
+        -u OTEL_SERVICE_NAME \
+        -u TRACEPARENT \
+    java -XX:ArchiveClassesAtExit=/preparo/aplicacao.jsa \
          -Dspring.context.exit=onRefresh \
+         -Dmanagement.tracing.enabled=false \
          -Dservicetrack.security.jwt.habilitado=false \
          -Dspring.main.banner-mode=off \
          -DST_CAT_DB_URL=jdbc:postgresql://localhost:5432/st_cat \
@@ -61,7 +70,9 @@ RUN java -XX:ArchiveClassesAtExit=/preparo/aplicacao.jsa \
          -DST_INS_MONGO_URI=mongodb://localhost:27017/ST_INS \
          org.springframework.boot.loader.launch.JarLauncher > /preparo/treino.log 2>&1 \
     && test -s /preparo/aplicacao.jsa \
-    || (echo "ERRO: o treino de CDS nao completou o refresh do contexto" && tail -30 /preparo/treino.log && exit 1)
+    || (echo "ERRO: o treino de CDS nao completou o refresh do contexto" \
+        && grep -oE "threw exception with message: .*" /preparo/treino.log | tail -2 \
+        && tail -25 /preparo/treino.log && exit 1)
 
 
 FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine AS runtime
