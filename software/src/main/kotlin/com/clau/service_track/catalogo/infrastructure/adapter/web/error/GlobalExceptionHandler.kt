@@ -13,6 +13,7 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.AuthenticationException
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
@@ -75,6 +76,17 @@ class GlobalExceptionHandler(
         status = HttpStatus.BAD_REQUEST,
         codigo = CodigoErro.CORPO_ILEGIVEL,
         mensagem = "Corpo da requisição não é um JSON válido ou não corresponde ao schema esperado",
+        requisicao = requisicao,
+    )
+
+    @ExceptionHandler(MissingRequestHeaderException::class)
+    fun cabecalhoAusente(
+        e: MissingRequestHeaderException,
+        requisicao: HttpServletRequest,
+    ): ResponseEntity<ErrorResponse> = fabrica.montar(
+        status = HttpStatus.BAD_REQUEST,
+        codigo = CodigoErro.PARAMETRO_INVALIDO,
+        mensagem = "Cabeçalho obrigatório '${e.headerName}' não foi informado",
         requisicao = requisicao,
     )
 
