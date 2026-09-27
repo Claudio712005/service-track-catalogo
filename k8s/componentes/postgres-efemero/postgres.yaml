@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-track-catalogo-postgres
+  labels:
+    app: service-track-catalogo-postgres
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: service-track-catalogo-postgres
+  template:
+    metadata:
+      labels:
+        app: service-track-catalogo-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: st_cat
+            - name: POSTGRES_USER
+              value: st_cat_user
+            - name: POSTGRES_PASSWORD
+              value: st_cat_local
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "st_cat_user", "-d", "st_cat"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: dados
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: dados
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-track-catalogo-postgres
+  labels:
+    app: service-track-catalogo-postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: service-track-catalogo-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

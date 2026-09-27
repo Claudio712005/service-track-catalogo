@@ -23,5 +23,8 @@ generatorOptions:
 configMapGenerator:
   - name: service-track-catalogo-config
     literals:
-      - SPRING_MONGODB_URI=mongodb://service-track-catalogo-mongo:27017/catalogo
+      - ST_INS_MONGO_URI=mongodb://service-track-catalogo-mongo:27017/ST_INS
+      - ST_CAT_DB_POOL_MAX=10
+      - ST_CAT_DB_POOL_MIN=2
+      - SERVICETRACK_MENSAGERIA_HABILITADA=false
       - OTEL_JAVAAGENT_ENABLED=false

@@ -25,6 +25,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: service-track-catalogo-config
+            - secretRef:
+                name: service-track-catalogo-db
+                optional: true
           startupProbe:
             httpGet:
               path: /actuator/health/readiness
