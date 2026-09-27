@@ -22,6 +22,9 @@ class OutboxEntity(
     @Column(name = "AGREGADO_ID", nullable = false)
     var agregadoId: UUID,
 
+    @Column(name = "CHAVE_PARTICAO", nullable = false, length = 60)
+    var chaveParticao: String,
+
     @Column(name = "TIPO_EVENTO", nullable = false, length = 60)
     var tipoEvento: String,
 

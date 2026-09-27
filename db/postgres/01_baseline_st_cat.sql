@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS OUTBOX (
     ID UUID NOT NULL,
     AGREGADO_TIPO VARCHAR(40) NOT NULL,
     AGREGADO_ID UUID NOT NULL,
+    CHAVE_PARTICAO VARCHAR(60) NOT NULL,
     TIPO_EVENTO VARCHAR(60) NOT NULL,
     VERSAO_EVENTO SMALLINT NOT NULL DEFAULT 1,
     PAYLOAD JSONB NOT NULL,
@@ -185,6 +186,7 @@ CREATE TABLE IF NOT EXISTS INBOX (
 
 COMMENT ON TABLE OUTBOX IS 'Evento gravado na MESMA transacao que muda o dado, publicado depois por um leitor. Sem isso, gravar no banco e publicar na fila sao dois passos que falham em separado.';
 COMMENT ON COLUMN OUTBOX.AGREGADO_TIPO IS 'Agregado que originou o evento: INSUMO, SALDO_ESTOQUE, SERVICO.';
+COMMENT ON COLUMN OUTBOX.CHAVE_PARTICAO IS 'Chave da mensagem no broker. Garante ordem entre eventos da mesma ordem de servico, que e a ordem de que a saga depende.';
 COMMENT ON COLUMN OUTBOX.TIPO_EVENTO IS 'Nome do evento publicado, por exemplo ESTOQUE_RESERVADO.';
 COMMENT ON COLUMN OUTBOX.VERSAO_EVENTO IS 'Versao do contrato do evento. Evolucao e aditiva: campo novo nao muda a versao, remocao muda.';
 COMMENT ON COLUMN OUTBOX.PAYLOAD IS 'Corpo do evento em JSONB, no formato do contrato publicado.';
