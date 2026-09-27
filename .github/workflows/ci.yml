@@ -134,7 +134,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Conferir que a imagem sobe e fala com os dois bancos
+      - name: Conferir que a imagem sobe, fala com os dois bancos e consome do Kafka
         run: |
           docker network create catalogo-ci
           docker run -d --name mongo --network catalogo-ci mongo:7
@@ -143,9 +143,21 @@ jobs:
             -e POSTGRES_USER=st_cat_user \
             -e POSTGRES_PASSWORD=st_cat_ci \
             postgres:16
+          docker run -d --name kafka --network catalogo-ci \
+            -e KAFKA_NODE_ID=1 \
+            -e KAFKA_PROCESS_ROLES=broker,controller \
+            -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
+            -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
+            -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+            -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
+            -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 \
+            -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+            -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
+            -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+            apache/kafka:3.9.0
 
           limpar() {
-            docker rm -f catalogo postgres mongo >/dev/null 2>&1 || true
+            docker rm -f catalogo postgres mongo kafka >/dev/null 2>&1 || true
             docker network rm catalogo-ci >/dev/null 2>&1 || true
           }
 
@@ -168,24 +180,65 @@ jobs:
             exit 1
           fi
 
+          for tentativa in $(seq 1 30); do
+            docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1 && break
+            sleep 4
+          done
+
+          for topico in servicetrack.estoque.comandos.v1 servicetrack.estoque.comandos.v1.dlt servicetrack.estoque.eventos.v1; do
+            docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
+              --create --topic "$topico" --partitions 3 --replication-factor 1 >/dev/null
+          done
+
           docker run -d --name catalogo --network catalogo-ci \
             -e SPRING_PROFILES_ACTIVE=dev \
             -e ST_CAT_DB_URL=jdbc:postgresql://postgres:5432/st_cat \
             -e ST_CAT_DB_USER=st_cat_user \
             -e ST_CAT_DB_PASSWORD=st_cat_ci \
             -e ST_INS_MONGO_URI=mongodb://mongo:27017/ST_INS \
+            -e SERVICETRACK_MENSAGERIA_HABILITADA=true \
+            -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
             -p 8080:8080 \
             servicetrack-catalogo:${{ github.sha }}
 
+          SUBIU=nao
           for tentativa in $(seq 1 30); do
             CODIGO="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health || echo 000)"
             if [ "$CODIGO" = "200" ]; then
               echo "Aplicacao respondeu UP em ${tentativa}0s."
-              limpar
-              exit 0
+              SUBIU=sim
+              break
             fi
             sleep 10
           done
+
+          if [ "$SUBIU" = "sim" ]; then
+            INSUMO="018f30bb-77a1-7c22-9b10-2a44de81f0aa"
+            ORDEM="$(cat /proc/sys/kernel/random/uuid)"
+            docker cp db/mongo/02_seed_st_ins.js mongo:/tmp/seed.js
+            docker exec mongo mongosh ST_INS --quiet --file /tmp/seed.js
+
+            printf '%s:{"idMensagem":"%s","tipo":"RegistrarEntradaDeEstoque","versao":1,"ocorridoEm":"2026-01-01T00:00:00Z","dados":{"insumoId":"%s","quantidade":12}}\n' \
+              "$ORDEM" "$(cat /proc/sys/kernel/random/uuid)" "$INSUMO" \
+              | docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
+                  --bootstrap-server localhost:9092 \
+                  --topic servicetrack.estoque.comandos.v1 \
+                  --property parse.key=true --property key.separator=:
+
+            for tentativa in $(seq 1 15); do
+              DISPONIVEL="$(curl -s "http://localhost:8080/insumos/$INSUMO/estoque" \
+                | grep -oE '"quantidadeDisponivel":[0-9.]+' | cut -d: -f2 || true)"
+              case "$DISPONIVEL" in
+                12|12.*) echo "Comando consumido do Kafka: disponivel=$DISPONIVEL"; limpar; exit 0 ;;
+              esac
+              sleep 4
+            done
+
+            echo "::error::A aplicacao subiu, mas o comando publicado no Kafka nao chegou ao saldo."
+            docker logs catalogo | tail -n 60
+            limpar
+            exit 1
+          fi
 
           echo "::error::A aplicacao nao respondeu UP em /actuator/health apos 5 minutos."
           curl -s http://localhost:8080/actuator/health || true
