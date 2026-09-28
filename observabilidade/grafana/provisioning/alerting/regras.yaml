@@ -1,0 +1,246 @@
+apiVersion: 1
+
+groups:
+
+  - orgId: 1
+    name: catalogo-disponibilidade
+    folder: ServiceTrack
+    interval: 30s
+    rules:
+
+      - uid: catalogo-fora-do-ar
+        title: Catálogo fora do ar
+        condition: B
+        for: 1m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severidade: critica
+          servico: service-track-catalogo
+        annotations:
+          summary: O serviço de catálogo não responde ao Prometheus
+          description: >
+            Nenhuma coleta bem-sucedida em /actuator/prometheus. Comandos de estoque na fila
+            não estão sendo consumidos e a API está indisponível. Conferir os logs do
+            contêiner e a saúde de Postgres e Mongo, que são dependências de subida.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              expr: up{job="catalogo"}
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: B
+
+      - uid: catalogo-erro-5xx
+        title: Taxa de erro 5xx acima de 5%
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alta
+          servico: service-track-catalogo
+        annotations:
+          summary: Mais de 5% das requisições HTTP terminam em erro do servidor
+          description: >
+            Percentual calculado sobre a janela de 5 minutos. Erro 5xx aqui é defeito nosso,
+            não do cliente: 4xx de regra de negócio não entra nesta conta.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              expr: >
+                100 * (sum(rate(http_server_requests_seconds_count{job="catalogo",outcome="SERVER_ERROR"}[5m])) or vector(0))
+                / clamp_min(sum(rate(http_server_requests_seconds_count{job="catalogo"}[5m])), 0.001)
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+              refId: B
+
+      - uid: catalogo-latencia-p95
+        title: Latência p95 acima de 1s
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: media
+          servico: service-track-catalogo
+        annotations:
+          summary: 5% das requisições passam de 1 segundo
+          description: >
+            Suspeitar primeiro do pool do Hikari e das consultas ao Mongo do catálogo de
+            insumos. O painel "Catálogo — visão geral" mostra as duas coisas lado a lado.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              expr: >
+                histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="catalogo"}[5m])))
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [1] }
+              refId: B
+
+  - orgId: 1
+    name: catalogo-mensageria
+    folder: ServiceTrack
+    interval: 30s
+    rules:
+
+      - uid: catalogo-outbox-parado
+        title: Outbox acumulando evento pendente
+        condition: B
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alta
+          servico: service-track-catalogo
+        annotations:
+          summary: Eventos gravados no outbox não estão saindo para o broker
+          description: >
+            O dado já mudou no banco e a saga do outro lado não soube. É o sintoma mais
+            importante deste serviço, porque não dá erro em lugar nenhum: dá silêncio.
+            Conferir se o broker responde e os logs do publicador do outbox.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              expr: max(catalogo_outbox_pendentes{job="catalogo"})
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [20] }
+              refId: B
+
+      - uid: catalogo-comando-invalido
+        title: Comando descartado para a DLT
+        condition: B
+        for: 0m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alta
+          servico: service-track-catalogo
+        annotations:
+          summary: Mensagem do tópico de comandos não pôde ser processada e foi para a DLT
+          description: >
+            Envelope incompleto, corpo fora do contrato ou tipo desconhecido. Não é falha
+            transitória: não há retentativa que resolva. Ler a mensagem na DLT
+            servicetrack.estoque.comandos.v1.dlt antes de mexer em qualquer coisa.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 900, to: 0 }
+            model:
+              expr: sum(increase(catalogo_estoque_comandos_total{job="catalogo",resultado="invalido"}[10m]))
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: B
+
+      - uid: catalogo-consumidor-atrasado
+        title: Consumidor atrasado na fila de comandos
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: media
+          servico: service-track-catalogo
+        annotations:
+          summary: Mais de 100 mensagens de atraso no grupo catalogo-estoque
+          description: >
+            A saga espera resposta que não chega no tempo dela, e reserva com prazo pode
+            expirar antes de ser consumida. Ver se o consumidor está em retentativa ou se o
+            banco está lento.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              expr: max(kafka_consumer_fetch_manager_records_lag_max{job="catalogo"})
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [100] }
+              refId: B
+
+  - orgId: 1
+    name: catalogo-banco
+    folder: ServiceTrack
+    interval: 30s
+    rules:
+
+      - uid: catalogo-pool-saturado
+        title: Pool de conexão saturado
+        condition: B
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alta
+          servico: service-track-catalogo
+        annotations:
+          summary: Requisições esperando conexão livre no Hikari
+          description: >
+            Pool de conexão é orçamento declarado no Terraform deste serviço, não ajuste
+            local. Subir o teto exige revisar db_pool_maximo e replicas_maximas juntos —
+            o apply recusa a soma que estoura o max_connections do banco.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: { from: 300, to: 0 }
+            model:
+              expr: max(hikaricp_connections_pending{job="catalogo"})
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: B

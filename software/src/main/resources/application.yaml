@@ -24,10 +24,31 @@ spring:
           time_zone: UTC
   mongodb:
     uri: ${ST_INS_MONGO_URI}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    client-id: ${spring.application.name}
+    consumer:
+      group-id: ${servicetrack.mensageria.grupo}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 10
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        max.poll.interval.ms: 120000
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+        max.block.ms: 10000
 
 logging:
   pattern:
-    correlation: "[${spring.application.name:catalogo},%X{correlationId:-},%X{transactionId:-}] "
+    correlation: "[${spring.application.name:catalogo},%X{trace_id:-},%X{correlationId:-},%X{transactionId:-}] "
   level:
     root: INFO
     com.clau.service_track.catalogo: INFO
@@ -35,8 +56,28 @@ logging:
     org.mongodb.driver.cluster: WARN
     org.mongodb.driver.connection: WARN
     org.hibernate.SQL: WARN
+    org.apache.kafka.clients: WARN
+    org.apache.kafka.clients.NetworkClient: ERROR
+    org.apache.kafka.common.utils.AppInfoParser: WARN
 
 servicetrack:
+  mensageria:
+    habilitada: ${SERVICETRACK_MENSAGERIA_HABILITADA:false}
+    grupo: ${SERVICETRACK_MENSAGERIA_GRUPO:catalogo-estoque}
+    topico-de-comandos: ${SERVICETRACK_TOPICO_COMANDOS:servicetrack.estoque.comandos.v1}
+    topico-de-eventos: ${SERVICETRACK_TOPICO_EVENTOS:servicetrack.estoque.eventos.v1}
+    sufixo-da-dlt: .dlt
+    concorrencia: ${SERVICETRACK_MENSAGERIA_CONCORRENCIA:1}
+    tentativas: 4
+    espera-inicial: 500ms
+    espera-maxima: 5s
+    multiplicador-da-espera: 2.0
+    intervalo-de-publicacao: 2s
+    lote-de-publicacao: 50
+    expiracao-de-reservas:
+      habilitada: ${SERVICETRACK_EXPIRACAO_RESERVAS:true}
+      intervalo: 60s
+      lote: 100
   security:
     jwt:
       habilitado: false
@@ -49,6 +90,12 @@ management:
     web:
       exposure:
         include: health,info,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,500ms,1s,3s
   endpoint:
     health:
       probes:
@@ -67,6 +114,8 @@ spring:
     uri: ${ST_INS_MONGO_URI:mongodb://localhost:27017/ST_INS?serverSelectionTimeoutMS=2000&connectTimeoutMS=2000}
 
 servicetrack:
+  mensageria:
+    habilitada: ${SERVICETRACK_MENSAGERIA_HABILITADA:true}
   security:
     jwt:
       habilitado: false
@@ -74,3 +123,4 @@ servicetrack:
 logging:
   level:
     com.clau.service_track.catalogo: DEBUG
+    org.apache.kafka: WARN

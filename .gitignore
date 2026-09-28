@@ -11,3 +11,8 @@
 .env
 .env.*
 !.env.exemplo
+
+keys/
+*.pem
+*.p12
+*.jks

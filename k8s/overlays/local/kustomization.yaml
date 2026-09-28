@@ -6,6 +6,11 @@ namespace: service-track-catalogo
 resources:
   - ../../base
 
+components:
+  - ../../componentes/postgres-efemero
+  - ../../componentes/mongo-efemero
+  - ../../componentes/kafka-efemero
+
 images:
   - name: servicetrack-catalogo
     newTag: local
@@ -22,3 +27,9 @@ configMapGenerator:
     literals:
       - SPRING_PROFILES_ACTIVE=dev
       - OTEL_JAVAAGENT_ENABLED=false
+      - ST_CAT_DB_URL=jdbc:postgresql://service-track-catalogo-postgres:5432/st_cat
+      - ST_CAT_DB_USER=st_cat_user
+      - ST_CAT_DB_PASSWORD=st_cat_local
+      - ST_INS_MONGO_URI=mongodb://service-track-catalogo-mongo:27017/ST_INS
+      - SERVICETRACK_MENSAGERIA_HABILITADA=true
+      - KAFKA_BOOTSTRAP_SERVERS=service-track-catalogo-kafka:9092

@@ -15,7 +15,6 @@ class Insumo private constructor(
     val sku: String,
     val nome: String,
     val unidadeDeMedida: UnidadeDeMedida,
-    val estoqueMinimo: BigDecimal,
     val dataCriacao: LocalDateTime,
     descricao: String,
     custo: ValorMonetario,
@@ -27,7 +26,6 @@ class Insumo private constructor(
     validadeEmDias: Int?,
     especificacao: Especificacao,
     dataAtualizacao: LocalDateTime,
-    qtdEstoque: BigDecimal,
     ativo: Boolean,
 ) {
 
@@ -61,14 +59,8 @@ class Insumo private constructor(
     var dataAtualizacao: LocalDateTime = dataAtualizacao
         private set
 
-    var qtdEstoque: BigDecimal = qtdEstoque
-        private set
-
     var ativo: Boolean = ativo
         private set
-
-    val abaixoDoEstoqueMinimo: Boolean
-        get() = qtdEstoque < estoqueMinimo
 
     fun desativar() {
         if (!ativo) throw ConflitoDeEstadoException("Insumo já está desativado")
@@ -112,26 +104,6 @@ class Insumo private constructor(
         marcarAtualizacao()
     }
 
-    fun reservar(qtdNecessaria: BigDecimal) {
-        exigirQuantidadePositiva(qtdNecessaria)
-        exigirCompativelComUnidade(qtdNecessaria)
-        if (qtdNecessaria > qtdEstoque) {
-            throw ConflitoDeEstadoException(
-                "Quantidade necessária (${formatar(qtdNecessaria)}) excede o estoque disponível " +
-                    "(${formatar(qtdEstoque)})"
-            )
-        }
-        qtdEstoque -= qtdNecessaria
-        marcarAtualizacao()
-    }
-
-    fun adicionarAoEstoque(qtdAdicional: BigDecimal) {
-        exigirQuantidadePositiva(qtdAdicional)
-        exigirCompativelComUnidade(qtdAdicional)
-        qtdEstoque += qtdAdicional
-        marcarAtualizacao()
-    }
-
     fun calcularCusto(quantidade: BigDecimal): ValorMonetario {
         exigirQuantidadePositiva(quantidade)
         return custo * quantidade
@@ -167,17 +139,6 @@ class Insumo private constructor(
         }
     }
 
-    private fun exigirCompativelComUnidade(quantidade: BigDecimal) {
-        if (!unidadeDeMedida.fracionavel && quantidade.stripTrailingZeros().scale() > 0) {
-            throw DomainException(
-                "A unidade ${unidadeDeMedida.simbolo} não admite fração; informe uma quantidade inteira"
-            )
-        }
-    }
-
-    private fun formatar(quantidade: BigDecimal): String =
-        "${quantidade.stripTrailingZeros().toPlainString()} ${unidadeDeMedida.simbolo}"
-
     private fun marcarAtualizacao() {
         dataAtualizacao = LocalDateTime.now()
     }
@@ -207,16 +168,8 @@ class Insumo private constructor(
             codigoBarras: String? = null,
             controlaLote: Boolean = false,
             validadeEmDias: Int? = null,
-            qtdEstoqueInicial: BigDecimal = BigDecimal.ZERO,
-            estoqueMinimo: BigDecimal = BigDecimal.ZERO,
         ): Insumo {
             if (nome.isBlank()) throw DomainException("Nome do insumo não pode ser vazio")
-            if (qtdEstoqueInicial < BigDecimal.ZERO) {
-                throw DomainException("Quantidade inicial de estoque não pode ser negativa")
-            }
-            if (estoqueMinimo < BigDecimal.ZERO) {
-                throw DomainException("Estoque mínimo não pode ser negativo")
-            }
             if (validadeEmDias != null && validadeEmDias < 0) {
                 throw DomainException("Prazo de validade não pode ser negativo")
             }
@@ -229,7 +182,6 @@ class Insumo private constructor(
                 sku = validarSku(sku),
                 nome = nome.trim(),
                 unidadeDeMedida = unidadeDeMedida,
-                estoqueMinimo = estoqueMinimo,
                 dataCriacao = agora,
                 descricao = descricao.trim(),
                 custo = custo,
@@ -241,7 +193,6 @@ class Insumo private constructor(
                 validadeEmDias = validadeEmDias,
                 especificacao = Especificacao.de(categoria, especificacao),
                 dataAtualizacao = agora,
-                qtdEstoque = qtdEstoqueInicial,
                 ativo = true,
             )
         }
@@ -263,8 +214,6 @@ class Insumo private constructor(
             codigoBarras: String? = null,
             controlaLote: Boolean = false,
             validadeEmDias: Int? = null,
-            estoqueMinimo: BigDecimal = BigDecimal.ZERO,
-            qtdEstoque: BigDecimal = BigDecimal.ZERO,
             ativo: Boolean = true,
         ): Insumo = Insumo(
             id = id,
@@ -272,7 +221,6 @@ class Insumo private constructor(
             sku = sku,
             nome = nome,
             unidadeDeMedida = unidadeDeMedida,
-            estoqueMinimo = estoqueMinimo,
             dataCriacao = dataCriacao,
             descricao = descricao,
             custo = custo,
@@ -284,7 +232,6 @@ class Insumo private constructor(
             validadeEmDias = validadeEmDias,
             especificacao = especificacao,
             dataAtualizacao = dataAtualizacao,
-            qtdEstoque = qtdEstoque,
             ativo = ativo,
         )
 

@@ -5,7 +5,7 @@ const definicaoCategorias = {
         $jsonSchema: {
             bsonType: "object",
             title: "Categoria de insumo e os atributos que ela exige",
-            required: ["_id", "CODIGO", "NOME", "UNIDADE_PADRAO", "ATRIBUTOS", "DATA_CRIACAO"],
+            required: ["_id", "CODIGO", "NOME", "UNIDADE_PADRAO", "ATIVA", "ATRIBUTOS", "DATA_CRIACAO"],
             properties: {
                 _id: { bsonType: "string", description: "UUID v7 em texto, gerado pela aplicacao." },
                 CODIGO: { bsonType: "string", minLength: 2, maxLength: 40, description: "Codigo estavel da categoria, em maiuscula. Ex: OLEO_MOTOR." },
@@ -14,6 +14,7 @@ const definicaoCategorias = {
                     enum: ["UNIDADE", "PECA", "LITRO", "MILILITRO", "GALAO", "QUILOGRAMA", "GRAMA", "METRO", "CONJUNTO"],
                     description: "Unidade sugerida ao cadastrar insumo desta categoria."
                 },
+                ATIVA: { bsonType: "bool", description: "Falso retira a categoria e os insumos dela da listagem padrao, e barra cadastro de insumo novo. Nada e apagado." },
                 ATRIBUTOS: {
                     bsonType: "array",
                     description: "Definicoes que o usuario da oficina cria em runtime. E dado, nao schema: atributo novo nao exige deploy.",

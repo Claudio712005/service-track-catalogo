@@ -1,5 +1,6 @@
 package com.clau.service_track.catalogo.domain.model
 
+import com.clau.service_track.catalogo.domain.exception.ConflitoDeEstadoException
 import com.clau.service_track.catalogo.domain.exception.DomainException
 import com.clau.service_track.catalogo.domain.vo.DefinicaoDeAtributo
 import com.clau.service_track.catalogo.domain.vo.DomainId
@@ -11,16 +12,41 @@ class CategoriaDeInsumo private constructor(
     val nome: String,
     val unidadePadrao: UnidadeDeMedida,
     atributos: List<DefinicaoDeAtributo>,
+    ativa: Boolean,
 ) {
 
     var atributos: List<DefinicaoDeAtributo> = atributos
+        private set
+
+    var ativa: Boolean = ativa
         private set
 
     fun definicaoDe(chave: String): DefinicaoDeAtributo? = atributos.firstOrNull { it.chave == chave }
 
     fun obrigatorios(): List<DefinicaoDeAtributo> = atributos.filter { it.obrigatorio }
 
+    fun desativar() {
+        if (!ativa) throw ConflitoDeEstadoException("Categoria '$nome' já está desativada")
+        ativa = false
+    }
+
+    fun reativar() {
+        if (ativa) throw ConflitoDeEstadoException("Categoria '$nome' já está ativa")
+        ativa = true
+    }
+
+    fun exigirAtivaParaCadastro() {
+        if (!ativa) {
+            throw ConflitoDeEstadoException(
+                "Categoria '$nome' está desativada e não aceita insumo novo. Reative a categoria antes"
+            )
+        }
+    }
+
     fun acrescentarAtributo(definicao: DefinicaoDeAtributo) {
+        if (!ativa) {
+            throw ConflitoDeEstadoException("Categoria '$nome' está desativada e não pode receber atributo")
+        }
         if (definicaoDe(definicao.chave) != null) {
             throw DomainException("Categoria '$nome' já possui o atributo '${definicao.chave}'")
         }
@@ -56,6 +82,7 @@ class CategoriaDeInsumo private constructor(
             }
 
             return CategoriaDeInsumo(
+                ativa = true,
                 id = DomainId.gerar(),
                 codigo = codigo.trim().uppercase(),
                 nome = nome,
@@ -70,6 +97,7 @@ class CategoriaDeInsumo private constructor(
             nome: String,
             unidadePadrao: UnidadeDeMedida,
             atributos: List<DefinicaoDeAtributo>,
-        ): CategoriaDeInsumo = CategoriaDeInsumo(id, codigo, nome, unidadePadrao, atributos)
+            ativa: Boolean = true,
+        ): CategoriaDeInsumo = CategoriaDeInsumo(id, codigo, nome, unidadePadrao, atributos, ativa)
     }
 }

@@ -19,9 +19,3 @@ interface InsumoRepositoryPort {
 
     fun contarPorCategoria(categoriaId: DomainId): Long
 }
-
-data class FiltroDeInsumo(
-    val incluirInativos: Boolean = false,
-    val categoriaId: DomainId? = null,
-    val termo: String? = null,
-)

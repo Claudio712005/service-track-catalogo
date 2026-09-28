@@ -7,16 +7,61 @@ daqui, ninguém roda `kubectl apply` na aplicação.
 k8s/
 ├── base/                    Deployment, Service ClusterIP, namespace, HPA
 ├── componentes/
-│   └── mongo-efemero/       Mongo de dado descartável, usado por hml e prd
+│   ├── mongo-efemero/       Mongo de dado descartável, usado por local, hml e prd
+│   ├── postgres-efemero/    Postgres de dado descartável, só no local
+│   └── kafka-efemero/       Broker KRaft de nó único, só no local
 ├── overlays/
-│   ├── local/               kind, imagem local, repositório em memória
-│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero
-│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero
+│   ├── local/               kind, imagem local, os três bancos/broker em contêiner
+│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero, Postgres no RDS
+│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero, Postgres no RDS
 └── argocd/
     ├── local.yaml           Application do kind, aplicada à mão
     ├── hml.yaml             marcador de descoberta
     └── prd.yaml             marcador de descoberta
 ```
+
+## De onde vem cada dependência
+
+| Dependência | local (kind) | hml e prd |
+|---|---|---|
+| Postgres `st_cat` | `componentes/postgres-efemero` | RDS do próprio serviço, criado por `infra/terraform` |
+| Mongo `ST_INS` | `componentes/mongo-efemero` | `componentes/mongo-efemero` |
+| Broker Kafka | `componentes/kafka-efemero` | **nenhum ainda** — mensageria desligada por flag |
+
+A mensageria fica `SERVICETRACK_MENSAGERIA_HABILITADA=false` em `hml` e `prd` enquanto o broker
+da plataforma não existir: a escolha está aberta em `GLOBAL-RFC-010`. Desligada, o serviço sobe
+e atende HTTP normalmente, sem consumidor, publicador nem rotina de expiração. Ligar é trocar
+a flag e apontar `KAFKA_BOOTSTRAP_SERVERS` — nada de código.
+
+## Credencial do banco não vem do ConfigMap
+
+`hml` e `prd` leem `ST_CAT_DB_URL`, `ST_CAT_DB_USER` e `ST_CAT_DB_PASSWORD` do Secret
+`service-track-catalogo-db`, que **não está neste repositório** e nunca estará. Ele é criado a
+partir do SSM, no ritual de subida:
+
+```bash
+scripts/criar-secret-do-banco.sh hml
+```
+
+O `secretRef` no `base/deployment.yaml` é `optional: true` justamente porque no `local` não
+existe Secret: lá as credenciais do Postgres efêmero vêm nas literais do ConfigMap do overlay,
+que são descartáveis por definição.
+
+## Ordem de subida do ambiente
+
+```
+1. rede e EKS            (service-track-aws-iac)
+2. esteira Infra         (deste repo: ECR + RDS + SSM, e ela chama a esteira Banco)
+3. esteira Banco         (segredo do banco, baseline do Postgres e do Mongo, restart da app)
+4. esteira CD            (imagem no ECR + PR com a nova tag)
+5. merge do PR           (ArgoCD sincroniza o overlay do ambiente)
+```
+
+Sem Flyway, `ddl-auto: validate` recusa banco vazio: é esperado ver `CrashLoopBackOff` até o
+passo 3 ter rodado com o cluster de pé. Não é defeito de manifesto.
+
+A esteira Banco é idempotente e pode ser reexecutada a qualquer momento — inclusive depois do
+passo 5, que é quando o pod do Mongo costuma existir pela primeira vez.
 
 ## Como este serviço chega em hml e prd
 
@@ -96,6 +141,11 @@ repositório.
   Não usar em `hml` nem `prd`.
 - **`imagePullPolicy: IfNotPresent`**: a imagem é local, `kind` não deve tentar
   puxar do registry.
+- **Mensageria ligada**, contra o broker do `componentes/kafka-efemero`. Os
+  tópicos nascem sozinhos (`KAFKA_AUTO_CREATE_TOPICS_ENABLE=true`, 3 partições),
+  o que só é aceitável porque o dado é descartável. Em ambiente de verdade o
+  tópico é criado com política explícita, não por acidente do primeiro
+  consumidor.
 
 ## Subir localmente
 
@@ -127,6 +177,13 @@ kubectl apply -f k8s/argocd/local.yaml
 O `kind load docker-image` é obrigatório mesmo com o cluster já existindo: o
 kind não enxerga o Docker do host, a imagem precisa ser carregada
 explicitamente no nó do cluster a cada rebuild.
+
+Com os pods do Postgres e do Mongo prontos, aplicar o schema — sem isso a
+aplicação reinicia em laço, porque `ddl-auto` é `validate`:
+
+```bash
+scripts/aplicar-baseline.sh local
+```
 
 Conferir:
 

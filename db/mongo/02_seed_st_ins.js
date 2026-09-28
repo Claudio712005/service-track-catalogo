@@ -4,6 +4,7 @@ const categorias = [
         CODIGO: "OLEO_MOTOR",
         NOME: "Óleo de motor",
         UNIDADE_PADRAO: "LITRO",
+        ATIVA: true,
         ATRIBUTOS: [
             { CHAVE: "viscosidade", ROTULO: "Viscosidade", TIPO: "OPCAO", OBRIGATORIO: true, OPCOES: ["0W20", "5W30", "10W40", "15W40"], ORDEM: 0 },
             { CHAVE: "especificacao-api", ROTULO: "Especificação API", TIPO: "TEXTO", OBRIGATORIO: true, OPCOES: [], ORDEM: 0 },
@@ -17,6 +18,7 @@ const categorias = [
         CODIGO: "PNEU",
         NOME: "Pneu",
         UNIDADE_PADRAO: "UNIDADE",
+        ATIVA: true,
         ATRIBUTOS: [
             { CHAVE: "aro", ROTULO: "Aro", TIPO: "INTEIRO", UNIDADE: "pol", OBRIGATORIO: true, OPCOES: [], ORDEM: 0 },
             { CHAVE: "indice-carga", ROTULO: "Índice de carga", TIPO: "INTEIRO", OBRIGATORIO: false, OPCOES: [], ORDEM: 1 }

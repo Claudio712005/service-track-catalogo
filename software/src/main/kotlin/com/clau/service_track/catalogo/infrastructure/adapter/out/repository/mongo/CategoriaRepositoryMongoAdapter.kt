@@ -36,13 +36,15 @@ class CategoriaRepositoryMongoAdapter(
         .findByCodigo(codigo.trim().uppercase())
         ?.let(mapper::paraDominio)
 
-    override fun listar(termo: String?): List<CategoriaDeInsumo> {
+    override fun listar(termo: String?, incluirDesativadas: Boolean): List<CategoriaDeInsumo> {
         val documentos = if (termo == null) {
             colecao.findAll()
         } else {
             colecao.findByCodigoContainingIgnoreCaseOrNomeContainingIgnoreCase(termo, termo)
         }
-        return documentos.map(mapper::paraDominio)
+        return documentos
+            .filter { incluirDesativadas || it.ativa }
+            .map(mapper::paraDominio)
     }
 
     override fun existeComCodigo(codigo: String): Boolean = colecao.existsByCodigo(codigo.trim().uppercase())

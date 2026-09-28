@@ -1,0 +1,132 @@
+name: Infra
+
+run-name: "Infra ${{ inputs.acao }} em ${{ inputs.env }} por @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Ambiente alvo"
+        required: true
+        type: choice
+        options: [hml, prd]
+        default: hml
+      acao:
+        description: "O que fazer"
+        required: true
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-${{ inputs.env }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  DIRETORIO: infra/terraform
+
+jobs:
+
+  terraform:
+    name: "1. ECR e RDS do catalogo"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: ${{ inputs.env }}
+    defaults:
+      run:
+        working-directory: ${{ env.DIRETORIO }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir os segredos do banco
+        env:
+          USUARIO: ${{ secrets.ST_CAT_DB_USER }}
+          SENHA: ${{ secrets.ST_CAT_DB_PASSWORD }}
+        run: |
+          faltando=0
+          [ -n "$USUARIO" ] || { echo "::error::Secret ST_CAT_DB_USER ausente no environment ${{ inputs.env }}."; faltando=1; }
+          [ -n "$SENHA" ] || { echo "::error::Secret ST_CAT_DB_PASSWORD ausente no environment ${{ inputs.env }}."; faltando=1; }
+          [ "$faltando" -eq 0 ] || exit 1
+          echo "Credencial do banco vem do environment, nao do Terraform."
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Conferir que a rede da plataforma existe
+        if: inputs.acao != 'destroy'
+        run: |
+          if ! aws ec2 describe-vpcs \
+                --filters "Name=tag:Name,Values=servicetrack-${{ inputs.env }}-vpc" \
+                --query 'Vpcs[0].VpcId' --output text | grep -qv "^None$"; then
+            echo "::error::A VPC servicetrack-${{ inputs.env }}-vpc nao existe."
+            echo "::error::O RDS vive nas subnets privadas dela. Suba antes a camada de rede pelo service-track-aws-iac."
+            exit 1
+          fi
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: terraform init -backend-config=backend/${{ inputs.env }}.hcl -reconfigure -input=false
+
+      - name: terraform validate
+        run: terraform validate -no-color
+
+      - name: terraform plan
+        if: inputs.acao == 'plan'
+        env:
+          TF_VAR_db_username: ${{ secrets.ST_CAT_DB_USER }}
+          TF_VAR_db_password: ${{ secrets.ST_CAT_DB_PASSWORD }}
+        run: terraform plan -no-color -input=false -var "ambiente=${{ inputs.env }}"
+
+      - name: terraform apply
+        if: inputs.acao == 'apply'
+        env:
+          TF_VAR_db_username: ${{ secrets.ST_CAT_DB_USER }}
+          TF_VAR_db_password: ${{ secrets.ST_CAT_DB_PASSWORD }}
+        run: terraform apply -no-color -input=false -auto-approve -var "ambiente=${{ inputs.env }}"
+
+      - name: terraform destroy
+        if: inputs.acao == 'destroy'
+        env:
+          TF_VAR_db_username: ${{ secrets.ST_CAT_DB_USER }}
+          TF_VAR_db_password: ${{ secrets.ST_CAT_DB_PASSWORD }}
+        run: terraform destroy -no-color -input=false -auto-approve -var "ambiente=${{ inputs.env }}"
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "### Infra de \`${{ inputs.env }}\` — ${{ inputs.acao }}"
+            echo ""
+            if [ "${{ inputs.acao }}" = "apply" ]; then
+              echo "| Saida | Onde ler |"
+              echo "|---|---|"
+              echo "| URL do ECR | \`/servicetrack/${{ inputs.env }}/catalogo/ecr-url\` |"
+              echo "| URL JDBC | \`/servicetrack/${{ inputs.env }}/catalogo/db/url\` |"
+              echo "| Senha | \`/servicetrack/${{ inputs.env }}/catalogo/db/password\` (SecureString) |"
+              echo ""
+              echo "Endpoint e senha mudam a cada recriacao: leia do SSM em tempo de uso."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  banco:
+    name: "2. Baseline dos bancos"
+    if: inputs.acao == 'apply'
+    needs: terraform
+    uses: ./.github/workflows/banco.yml
+    with:
+      env: ${{ inputs.env }}
+    secrets: inherit

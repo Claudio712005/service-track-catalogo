@@ -46,15 +46,33 @@ RUN mkdir -p /preparo/execucao \
 
 WORKDIR /preparo/execucao
 
-RUN java -XX:ArchiveClassesAtExit=/preparo/aplicacao.jsa \
+RUN env -u OTEL_EXPORTER_OTLP_ENDPOINT \
+        -u OTEL_EXPORTER_OTLP_PROTOCOL \
+        -u OTEL_EXPORTER_OTLP_TRACES_ENDPOINT \
+        -u OTEL_EXPORTER_OTLP_TRACES_PROTOCOL \
+        -u OTEL_EXPORTER_OTLP_LOGS_ENDPOINT \
+        -u OTEL_RESOURCE_ATTRIBUTES \
+        -u OTEL_SERVICE_NAME \
+        -u TRACEPARENT \
+    java -XX:ArchiveClassesAtExit=/preparo/aplicacao.jsa \
          -Dspring.context.exit=onRefresh \
+         -Dmanagement.tracing.enabled=false \
          -Dservicetrack.security.jwt.habilitado=false \
          -Dspring.main.banner-mode=off \
-         -Dspring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration \
+         -DST_CAT_DB_URL=jdbc:postgresql://localhost:5432/st_cat \
+         -DST_CAT_DB_USER=treino \
+         -DST_CAT_DB_PASSWORD=treino \
+         -Dspring.datasource.hikari.initialization-fail-timeout=-1 \
+         -Dspring.datasource.hikari.minimum-idle=0 \
+         -Dspring.jpa.hibernate.ddl-auto=none \
+         -Dspring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect \
+         -Dspring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false \
          -DST_INS_MONGO_URI=mongodb://localhost:27017/ST_INS \
          org.springframework.boot.loader.launch.JarLauncher > /preparo/treino.log 2>&1 \
     && test -s /preparo/aplicacao.jsa \
-    || (echo "AVISO: arquivo CDS nao gerado; a imagem sobe sem ele" && cat /preparo/treino.log | tail -20 && rm -f /preparo/aplicacao.jsa && touch /preparo/aplicacao.jsa)
+    || (echo "ERRO: o treino de CDS nao completou o refresh do contexto" \
+        && grep -oE "threw exception with message: .*" /preparo/treino.log | tail -2 \
+        && tail -25 /preparo/treino.log && exit 1)
 
 
 FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine AS runtime

@@ -39,13 +39,16 @@ class CategoriaRepositoryMemoriaAdapter : CategoriaRepositoryPort {
     override fun buscarPorCodigo(codigo: String): CategoriaDeInsumo? = acervo.values
         .firstOrNull { it.codigo.equals(codigo.trim(), ignoreCase = true) }
 
-    override fun listar(termo: String?): List<CategoriaDeInsumo> = acervo.values
+    override fun listar(termo: String?, incluirDesativadas: Boolean): List<CategoriaDeInsumo> = acervo.values
+        .filter { incluirDesativadas || it.ativa }
         .filter { categoria ->
             termo == null ||
                 categoria.codigo.contains(termo, ignoreCase = true) ||
                 categoria.nome.contains(termo, ignoreCase = true)
         }
         .toList()
+
+    fun desativadas(): Set<DomainId> = acervo.values.filterNot { it.ativa }.map { it.id }.toSet()
 
     override fun existeComCodigo(codigo: String): Boolean = buscarPorCodigo(codigo) != null
 

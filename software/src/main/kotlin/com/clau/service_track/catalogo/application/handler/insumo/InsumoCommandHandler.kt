@@ -28,6 +28,11 @@ class InsumoCommandHandler(
         val categoria = exigirCategoria(comando.categoriaId)
         val sku = comando.sku.trim().uppercase()
 
+        if (!categoria.ativa) {
+            log.warn("insumo recusado: categoria desativada sku={} categoria={}", sku, categoria.codigo)
+        }
+        categoria.exigirAtivaParaCadastro()
+
         if (insumos.existeComSku(sku)) {
             log.warn("insumo recusado: sku ja cadastrado sku={}", sku)
             throw ConflitoDeEstadoException("Já existe um insumo cadastrado com o SKU '$sku'")

@@ -1,0 +1,200 @@
+{
+  "uid": "catalogo-mensageria",
+  "title": "Catálogo — mensageria e estoque",
+  "description": "Comandos consumidos do Kafka, eventos saindo pelo outbox, e o rastro correlacionado: log com trace_id e trace da operação.",
+  "tags": ["servicetrack", "catalogo", "kafka"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Eventos pendentes no outbox",
+      "description": "Acima de zero por muito tempo significa que o dado mudou no banco e a saga do outro lado não soube. Não gera erro em lugar nenhum: gera silêncio.",
+      "gridPos": { "h": 5, "w": 5, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max(catalogo_outbox_pendentes{job=\"catalogo\"})", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 20 }] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "stat",
+      "title": "Atraso do consumidor",
+      "gridPos": { "h": 5, "w": 5, "x": 5, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max(kafka_consumer_fetch_manager_records_lag_max{job=\"catalogo\"})", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 50 }, { "color": "red", "value": 100 }] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "stat",
+      "title": "Comandos descartados para a DLT",
+      "description": "Mensagem malformada ou de tipo desconhecido. Não há retentativa que resolva.",
+      "gridPos": { "h": 5, "w": 7, "x": 10, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(catalogo_estoque_comandos_total{job=\"catalogo\",resultado=\"invalido\"})", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "stat",
+      "title": "Reservas expiradas",
+      "description": "Reserva cujo prazo venceu sem a saga concluir, devolvida ao estoque pela rotina de expiração.",
+      "gridPos": { "h": 5, "w": 7, "x": 17, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(catalogo_estoque_reservas_expiradas_total{job=\"catalogo\"})", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "noValue": "0" }, "overrides": [] },
+      "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Comandos consumidos por tipo",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tipo) (rate(catalogo_estoque_comandos_total{job=\"catalogo\"}[5m]))",
+          "legendFormat": "{{tipo}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "showPoints": "never", "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Desfecho dos comandos",
+      "description": "aplicado é efeito novo; ja_processado é reentrega barrada pela idempotência; recusado é regra de negócio, como saldo insuficiente; invalido vai para a DLT.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (resultado) (rate(catalogo_estoque_comandos_total{job=\"catalogo\"}[5m]))",
+          "legendFormat": "{{resultado}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "showPoints": "never", "stacking": { "mode": "normal" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "invalido" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "recusado" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byName", "options": "aplicado" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Eventos publicados a partir do outbox",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(catalogo_estoque_eventos_publicados_total{job=\"catalogo\"}[5m]))",
+          "legendFormat": "publicados"
+        },
+        {
+          "refId": "B",
+          "expr": "max(catalogo_outbox_pendentes{job=\"catalogo\"})",
+          "legendFormat": "pendentes"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 10, "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "pendentes" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Serviço de origem e destino, vindo dos traces",
+      "description": "Métricas geradas pelo Tempo a partir dos spans. É o que mostra a chamada atravessando a fila sem precisar de instrumentação manual.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service=\"service-track-catalogo\"}[5m]))",
+          "legendFormat": "{{span_name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean"] }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "type": "logs",
+      "title": "Log do serviço",
+      "description": "Cada linha carrega trace_id, correlationId e transactionId. O link do trace_id abre o trace no Tempo.",
+      "gridPos": { "h": 11, "w": 14, "x": 0, "y": 20 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=\"service-track-catalogo\"} | json | line_format \"{{.body}}\"",
+          "queryType": "range"
+        }
+      ],
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true, "dedupStrategy": "none" }
+    },
+    {
+      "type": "table",
+      "title": "Traces recentes",
+      "description": "Clique numa linha para abrir o trace completo, com os spans de HTTP, JDBC, Mongo e Kafka.",
+      "gridPos": { "h": 11, "w": 10, "x": 14, "y": 20 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceqlSearch",
+          "filters": [
+            {
+              "id": "servico",
+              "tag": "service.name",
+              "operator": "=",
+              "scope": "resource",
+              "value": ["service-track-catalogo"],
+              "valueType": "string"
+            }
+          ],
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "options": {}
+    }
+  ]
+}
