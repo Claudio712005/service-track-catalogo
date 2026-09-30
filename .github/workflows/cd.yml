@@ -86,9 +86,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Atualizar o overlay
+        env:
+          REPOSITORIO: ${{ needs.publicar.outputs.repositorio }}
+          TAG: ${{ needs.publicar.outputs.tag }}
         run: |
           ARQUIVO="k8s/overlays/${{ inputs.env }}/kustomization.yaml"
-          sed -i "s|^    newTag: .*|    newTag: ${{ needs.publicar.outputs.tag }}|" "$ARQUIVO"
+          sed -i "s|^    newName: .*|    newName: $REPOSITORIO|" "$ARQUIVO"
+          sed -i "s|^    newTag: .*|    newTag: $TAG|" "$ARQUIVO"
           git diff --stat
 
       - name: Abrir o pull request

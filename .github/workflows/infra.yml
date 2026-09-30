@@ -78,8 +78,17 @@ jobs:
           terraform_version: 1.10.5
           terraform_wrapper: false
 
+      - name: Descobrir o bucket de state
+        run: |
+          CONTA="$(aws sts get-caller-identity --query Account --output text)"
+          echo "BUCKET_DE_STATE=servicetrack-tfstate-$CONTA" >> "$GITHUB_ENV"
+          echo "backend em s3://servicetrack-tfstate-$CONTA"
+
       - name: terraform init
-        run: terraform init -backend-config=backend/${{ inputs.env }}.hcl -reconfigure -input=false
+        run: |
+          terraform init -input=false -reconfigure \
+            -backend-config=backend/${{ inputs.env }}.hcl \
+            -backend-config="bucket=$BUCKET_DE_STATE"
 
       - name: terraform validate
         run: terraform validate -no-color
