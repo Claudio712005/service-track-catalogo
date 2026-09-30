@@ -11,7 +11,7 @@ components:
 
 images:
   - name: servicetrack-catalogo
-    newName: 821146464895.dkr.ecr.us-east-1.amazonaws.com/servicetrack-prd-catalogo
+    newName: ecr-do-ambiente/servicetrack-prd-catalogo
     newTag: bootstrap
 
 patches:
