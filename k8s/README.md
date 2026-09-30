@@ -75,8 +75,13 @@ A `Application` em `hml`/`prd` **não** vem de `k8s/argocd/<ambiente>.yaml`: a e
 `aws-iac` usa esse arquivo só como marcador de descoberta e gera a `Application` a partir
 do template dela. O conteúdo daqui serve ao fluxo local e mantém o desenho visível.
 
-Enquanto o CD não rodar pela primeira vez, `newTag` aponta para `bootstrap`, que não existe
-no ECR: os pods ficam em `ImagePullBackOff`. É esperado num ambiente recém-criado.
+Enquanto o CD não rodar pela primeira vez, `newName` aponta para `ecr-do-ambiente` e `newTag`
+para `bootstrap` — nenhum dos dois existe: os pods ficam em `ImagePullBackOff`. É esperado num
+ambiente recém-criado.
+
+**O registro da imagem não está escrito aqui de propósito.** A URL do ECR carrega o
+identificador da conta AWS, e essa conta muda a cada laboratório. Quem escreve `newName` e
+`newTag` é a esteira CD, com o valor que ela lê do SSM. Ver `CAT-ADR-002` e `IAC-ADR-029`.
 
 Ver os pods no cluster da AWS:
 
