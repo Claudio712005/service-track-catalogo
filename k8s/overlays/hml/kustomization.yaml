@@ -11,8 +11,8 @@ components:
 
 images:
   - name: servicetrack-catalogo
-    newName: ecr-do-ambiente/servicetrack-hml-catalogo
-    newTag: bootstrap
+    newName: 734564927706.dkr.ecr.us-east-1.amazonaws.com/servicetrack-hml-catalogo
+    newTag: 26460d10b008427ee8e58b9716c9de893b4fdb58
 
 patches:
   - path: hpa-patch.yaml
