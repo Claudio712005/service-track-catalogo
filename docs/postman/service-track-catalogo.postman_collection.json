@@ -1,0 +1,976 @@
+{
+  "info": {
+    "name": "ServiceTrack — Catálogo",
+    "description": "Catálogo de insumos e serviços do ServiceTrack: categorias, insumos, saldo de estoque e serviços.\n\n## Como obter a URL\n\nO serviço é ClusterIP e o ambiente de homologação está sem API Gateway (`habilitar_borda = false`), então não existe endereço público. O acesso é por encaminhamento de porta:\n\n```bash\naws eks update-kubeconfig --name servicetrack-hml --region us-east-1\nkubectl -n service-track-catalogo port-forward svc/service-track-catalogo 18080:80\n```\n\nEnquanto o comando acima estiver rodando, `baseUrl` aponta para `http://localhost:18080`. Para o ambiente local em kind, troque a porta na variável `baseUrl` e nada mais muda.\n\n## Autenticação\n\nNenhuma. A validação de JWT está desligada por configuração neste ambiente, então não há cabeçalho de autorização. Quando a emissão de token entrar, a coleção passa a precisar de um `Authorization: Bearer`.\n\n## Cabeçalhos\n\nTodos os pedidos enviam dois cabeçalhos:\n\n- `X-API-Version`, atualmente `1`, declarado no contrato.\n- `X-Correlation-Id`, que o serviço propaga para o log. O valor padrão é `postman-local`, o que permite filtrar no Grafana por `correlationId=\"postman-local\"` e ver exatamente as requisições feitas por esta coleção.\n\nA entrada de estoque exige também `X-Idempotency-Key`, controlado pela variável `chaveDeIdempotencia`.\n\n## Dados que já existem\n\nO baseline aplicado pela esteira Banco semeia o catálogo: as categorias `OLEO_MOTOR` e `PNEU`, os insumos `OL-5W30-SYN-1L` e `PN-205-55-R16`, e sete serviços. Por isso:\n\n- As consultas funcionam no primeiro clique: `categoriaId` e `insumoId` já vêm preenchidos com registros do baseline.\n- Os três cadastros geram um valor único a cada envio (sufixo de horário no código da categoria, no SKU do insumo e no nome do serviço). Sem isso, enviar duas vezes responderia 409, e a primeira execução colidiria com o próprio baseline.\n\n## Ordem sugerida\n\n1. `Saúde e contrato` → `saúde`, para confirmar o acesso.\n2. `Categorias de insumo` → `criar categoria`, que preenche `categoriaId`.\n3. `Insumos` → `cadastrar insumo`, que depende de `categoriaId` e preenche `insumoId`.\n4. `Estoque de insumo` → `registrar entrada` e `consultar saldo`.\n5. `Serviços` → `cadastrar serviço`, que preenche `servicoId`.\n6. `Desativações`, se quiser exercitar o desligamento lógico. Rodar a coleção inteira de cima para baixo funciona, porque as desativações estão no fim.\n\nOs três pedidos de criação gravam o identificador devolvido na variável correspondente, então os demais funcionam sem copiar nada à mão.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:18080",
+      "description": "Endereço do serviço. Com port-forward ativo, http://localhost:18080."
+    },
+    {
+      "key": "versaoDaApi",
+      "value": "1",
+      "description": "Valor do cabeçalho X-API-Version, conforme o contrato."
+    },
+    {
+      "key": "correlacao",
+      "value": "postman-local",
+      "description": "Valor do cabeçalho X-Correlation-Id. Serve para achar estas chamadas no log."
+    },
+    {
+      "key": "categoriaId",
+      "value": "018f2c9a-5f2e-7c31-9a41-6f3b2d0e9c11",
+      "description": "Categoria OLEO_MOTOR do baseline, para as consultas funcionarem antes de criar nada. Sobrescrito por criar categoria."
+    },
+    {
+      "key": "insumoId",
+      "value": "018f30bb-77a1-7c22-9b10-2a44de81f0aa",
+      "description": "Insumo OL-5W30-SYN-1L do baseline. Sobrescrito por cadastrar insumo."
+    },
+    {
+      "key": "servicoId",
+      "value": "",
+      "description": "Preenchido por cadastrar serviço. O baseline gera identificadores novos a cada recriação, então não há valor fixo útil aqui."
+    },
+    {
+      "key": "sku",
+      "value": "OL-5W30-SYN-1L",
+      "description": "SKU da consulta por SKU. Cadastrar insumo substitui por um valor único."
+    },
+    {
+      "key": "categoriaCodigo",
+      "value": "OLEO_MOTOR_COLECAO",
+      "description": "Código enviado em criar categoria. O próprio pedido gera um valor único antes de enviar."
+    },
+    {
+      "key": "codigoBarras",
+      "value": "7891234567890",
+      "description": "Código de barras enviado em cadastrar insumo. O próprio pedido gera um valor único antes de enviar, porque o código é único no catálogo."
+    },
+    {
+      "key": "servicoNome",
+      "value": "Troca de óleo e filtro (coleção)",
+      "description": "Nome enviado em cadastrar serviço. O próprio pedido gera um valor único antes de enviar."
+    },
+    {
+      "key": "chaveDeIdempotencia",
+      "value": "entrada-001",
+      "description": "Cabeçalho X-Idempotency-Key da entrada de estoque. O pedido troca este valor padrão por um único no primeiro envio e mantém o valor depois, para que reenviar demonstre a idempotência."
+    }
+  ],
+  "item": [
+    {
+      "name": "Saúde e contrato",
+      "description": "Endpoints de operação, úteis para confirmar que o acesso está funcionando antes de testar o negócio.",
+      "item": [
+        {
+          "name": "saúde",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Responde UP quando a aplicação está pronta. É o primeiro pedido a disparar depois de abrir o port-forward."
+          },
+          "response": []
+        },
+        {
+          "name": "contrato OpenAPI",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            },
+            "description": "Contrato publicado pela própria aplicação. Esta coleção foi gerada a partir dele."
+          },
+          "response": []
+        },
+        {
+          "name": "métricas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/prometheus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "prometheus"
+              ]
+            },
+            "description": "Métricas no formato do Prometheus, incluindo http_server_requests_seconds e as do pool de conexões."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Categorias de insumo",
+      "description": "A categoria define quais características os insumos dela aceitam. Consulte a categoria antes de cadastrar insumo: a resposta diz exatamente quais chaves o mapa especificacao aceita, quais são obrigatórias e quais valores são válidos.",
+      "item": [
+        {
+          "name": "listar categorias",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categorias?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categorias"
+              ],
+              "query": [
+                {
+                  "key": "termo",
+                  "value": "oleo",
+                  "description": "Filtra por parte do código ou do nome, ignorando caixa.",
+                  "disabled": true
+                },
+                {
+                  "key": "incluirDesativadas",
+                  "value": "true",
+                  "description": "Inclui as categorias desativadas. Padrão false.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retorna as categorias ativas, ordenadas por nome, cada uma com os atributos que declara. O conjunto é pequeno por natureza e não é paginado."
+          },
+          "response": []
+        },
+        {
+          "name": "criar categoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categorias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categorias"
+              ]
+            },
+            "description": "Cria a categoria com o conjunto inicial de atributos. O código é normalizado para maiúsculas e é único. Atributo pode nascer obrigatório aqui, porque ainda não existe insumo na categoria. Guarda o identificador em categoriaId. O código recebe um sufixo de horário a cada envio, porque o baseline do banco já traz OLEO_MOTOR e código repetido responde 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{categoriaCodigo}}\",\n  \"nome\": \"Óleo de motor\",\n  \"unidadePadrao\": \"LITRO\",\n  \"atributos\": [\n    {\n      \"chave\": \"viscosidade\",\n      \"rotulo\": \"Viscosidade\",\n      \"tipo\": \"OPCAO\",\n      \"unidade\": null,\n      \"obrigatorio\": true,\n      \"opcoes\": [\n        \"0W20\",\n        \"5W30\",\n        \"10W40\",\n        \"15W40\"\n      ]\n    },\n    {\n      \"chave\": \"especificacao-api\",\n      \"rotulo\": \"Especificação API\",\n      \"tipo\": \"TEXTO\",\n      \"unidade\": null,\n      \"obrigatorio\": false,\n      \"opcoes\": []\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const agora = Date.now();",
+                  "pm.collectionVariables.set('categoriaCodigo', 'OLEO_MOTOR_' + agora);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('categoriaId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "consultar categoria",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categorias/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categorias",
+                "{{categoriaId}}"
+              ]
+            },
+            "description": "Retorna a categoria e a definição completa dos atributos dela. É a consulta que diz o que o mapa especificacao do insumo pode conter."
+          },
+          "response": []
+        },
+        {
+          "name": "acrescentar atributo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categorias/{{categoriaId}}/atributos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categorias",
+                "{{categoriaId}}",
+                "atributos"
+              ]
+            },
+            "description": "Declara uma característica nova para os insumos da categoria, em tempo de execução. O atributo não pode nascer obrigatório: os insumos já cadastrados não o têm, e exigi-lo tornaria inválido o que já está gravado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chave\": \"volume-ml\",\n  \"rotulo\": \"Volume\",\n  \"tipo\": \"INTEIRO\",\n  \"unidade\": \"ml\",\n  \"obrigatorio\": false,\n  \"opcoes\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Insumos",
+      "description": "Insumo é item de prateleira, sempre vinculado a uma categoria. O mapa especificacao é validado contra os atributos da categoria no momento do cadastro e da alteração.",
+      "item": [
+        {
+          "name": "listar insumos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos"
+              ],
+              "query": [
+                {
+                  "key": "termo",
+                  "value": "oleo",
+                  "description": "Busca por parte do SKU, do nome ou da marca, ignorando caixa.",
+                  "disabled": true
+                },
+                {
+                  "key": "categoriaId",
+                  "value": "{{categoriaId}}",
+                  "description": "Restringe a uma categoria.",
+                  "disabled": true
+                },
+                {
+                  "key": "incluirInativos",
+                  "value": "true",
+                  "description": "Inclui também os insumos desativados.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retorna os insumos ordenados por nome. Os filtros são combináveis e, por padrão, os desativados são omitidos."
+          },
+          "response": []
+        },
+        {
+          "name": "cadastrar insumo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos"
+              ]
+            },
+            "description": "Cria o insumo já ativo, com identificador gerado pelo servidor e sem saldo em estoque. Guarda o identificador em insumoId e depende de categoriaId. O SKU recebe um sufixo de horário a cada envio, porque é único e o baseline já traz OL-5W30-SYN-1L.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoriaId\": \"{{categoriaId}}\",\n  \"sku\": \"{{sku}}\",\n  \"nome\": \"Óleo 5W30 sintético 1L\",\n  \"descricao\": \"Óleo lubrificante sintético para motores a gasolina e flex, embalagem de 1 litro.\",\n  \"custo\": 38.9,\n  \"unidadeDeMedida\": \"LITRO\",\n  \"especificacao\": {\n    \"viscosidade\": \"5W30\",\n    \"especificacao-api\": \"SN\"\n  },\n  \"marca\": \"Lubrax\",\n  \"fabricante\": \"Petrobras\",\n  \"codigoFabricante\": \"LB-5W30-1L\",\n  \"codigoBarras\": \"{{codigoBarras}}\",\n  \"controlaLote\": true,\n  \"validadeEmDias\": 730\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const agora = Date.now();",
+                  "pm.collectionVariables.set('sku', 'OL-5W30-SYN-' + agora);",
+                  "pm.collectionVariables.set('codigoBarras', '789' + String(agora).slice(-10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('insumoId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "consultar insumo por identificador",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos/{{insumoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos",
+                "{{insumoId}}"
+              ]
+            },
+            "description": "Retorna o insumo independentemente de estar ativo: ordens de serviço antigas referenciam insumos já desativados e precisam continuar resolvendo."
+          },
+          "response": []
+        },
+        {
+          "name": "consultar insumo por SKU",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos/sku/{{sku}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos",
+                "sku",
+                "{{sku}}"
+              ]
+            },
+            "description": "Atalho para o balcão e para leitor de código. O SKU é único e estável, e a busca ignora caixa."
+          },
+          "response": []
+        },
+        {
+          "name": "alterar insumo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos/{{insumoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos",
+                "{{insumoId}}"
+              ]
+            },
+            "description": "Substitui integralmente os campos alteráveis, inclusive a especificação: atributo que não vier no corpo é removido do insumo. SKU, nome e categoria não são alteráveis. O código de barras reaproveita o valor gerado no cadastro: informar o de outro insumo responde 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Óleo lubrificante sintético para motores a gasolina, flex e GNV, embalagem de 1 litro.\",\n  \"custo\": 41.5,\n  \"especificacao\": {\n    \"viscosidade\": \"5W30\",\n    \"especificacao-api\": \"SP\"\n  },\n  \"marca\": \"Lubrax\",\n  \"fabricante\": \"Petrobras\",\n  \"codigoFabricante\": \"LB-5W30-1L\",\n  \"codigoBarras\": \"{{codigoBarras}}\",\n  \"controlaLote\": true,\n  \"validadeEmDias\": 730\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Estoque de insumo",
+      "description": "Saldo e movimentação do insumo. A entrada é idempotente pelo cabeçalho X-Idempotency-Key: repetir a mesma chave devolve o mesmo saldo, sem somar de novo.",
+      "item": [
+        {
+          "name": "consultar saldo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos/{{insumoId}}/estoque",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos",
+                "{{insumoId}}",
+                "estoque"
+              ]
+            },
+            "description": "Insumo que nunca recebeu movimento responde 200 com saldo zerado, não 404: o insumo existe, o saldo é que ainda não."
+          },
+          "response": []
+        },
+        {
+          "name": "registrar entrada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{chaveDeIdempotencia}}",
+                "description": "Chave escolhida pelo cliente. Obrigatória."
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos/{{insumoId}}/estoque/entradas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos",
+                "{{insumoId}}",
+                "estoque",
+                "entradas"
+              ]
+            },
+            "description": "Soma ao disponível e grava o movimento. No primeiro envio a chave recebe um valor único e permanece na variável: reenviar o mesmo pedido devolve o mesmo saldo, sem somar de novo. Para registrar uma entrada nova, limpe a variável chaveDeIdempotencia ou escolha outro valor.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantidade\": 24,\n  \"custoUnitario\": 38.9,\n  \"origemTipo\": \"NOTA_ENTRADA\",\n  \"origemId\": \"018f3d21-77aa-7c10-9d31-4b2c8e0f1a55\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const atual = pm.collectionVariables.get('chaveDeIdempotencia');",
+                  "if (!atual || atual === 'entrada-001') {",
+                  "  pm.collectionVariables.set('chaveDeIdempotencia', 'entrada-' + Date.now());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Serviços",
+      "description": "Serviço é mão de obra de catálogo, com valor de referência. O nome é único entre os serviços ativos e não é alterável depois da criação.",
+      "item": [
+        {
+          "name": "listar serviços",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicos?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicos"
+              ],
+              "query": [
+                {
+                  "key": "incluirInativos",
+                  "value": "true",
+                  "description": "Inclui também os serviços desativados.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retorna a coleção completa, ordenada por nome. O catálogo é limitado por natureza e não é paginado."
+          },
+          "response": []
+        },
+        {
+          "name": "cadastrar serviço",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicos"
+              ]
+            },
+            "description": "Cria o serviço já ativo, com identificador gerado pelo servidor. Nome repetido entre os ativos responde 409, e o baseline já traz vários serviços. O nome recebe um sufixo de horário a cada envio. Guarda o identificador em servicoId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{servicoNome}}\",\n  \"descricao\": \"Substituição do óleo lubrificante do motor e do filtro de óleo, com verificação de nível dos demais fluidos e descarte do material usado.\",\n  \"valorReferencia\": 189.9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const agora = Date.now();",
+                  "pm.collectionVariables.set('servicoNome', 'Troca de óleo e filtro ' + agora);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('servicoId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "consultar serviço",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicos/{{servicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicos",
+                "{{servicoId}}"
+              ]
+            },
+            "description": "Retorna o serviço independentemente de estar ativo, pelo mesmo motivo do insumo: ordens antigas continuam referenciando o registro."
+          },
+          "response": []
+        },
+        {
+          "name": "alterar serviço",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicos/{{servicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicos",
+                "{{servicoId}}"
+              ]
+            },
+            "description": "Substitui descrição e valor de referência. O nome não é alterável: ele identifica o serviço em ordens já emitidas, e renomear reescreveria o histórico.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Substituição do óleo lubrificante do motor, do filtro de óleo e do filtro de ar.\",\n  \"valorReferencia\": 209.9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Desativações",
+      "description": "As desativações ficam no fim para que rodar a coleção inteira, de cima para baixo, funcione: desativar a categoria antes de cadastrar insumo faria o cadastro ser recusado. Nada aqui apaga registro; tudo é desligamento lógico, e o registro continua consultável por identificador.",
+      "item": [
+        {
+          "name": "desativar insumo",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/insumos/{{insumoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "insumos",
+                "{{insumoId}}"
+              ]
+            },
+            "description": "Responde 204. O insumo continua consultável por identificador e por SKU; apenas deixa de aparecer na listagem padrão."
+          },
+          "response": []
+        },
+        {
+          "name": "desativar serviço",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/servicos/{{servicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "servicos",
+                "{{servicoId}}"
+              ]
+            },
+            "description": "Responde 204. O serviço continua consultável por identificador."
+          },
+          "response": []
+        },
+        {
+          "name": "desativar categoria",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categorias/{{categoriaId}}/ativacao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categorias",
+                "{{categoriaId}}",
+                "ativacao"
+              ]
+            },
+            "description": "Enquanto desativada, a categoria não aceita insumo novo nem atributo novo e sai da listagem. Para reativar, envie ativa igual a true.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ativa\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "reativar categoria",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "{{versaoDaApi}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlacao}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categorias/{{categoriaId}}/ativacao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categorias",
+                "{{categoriaId}}",
+                "ativacao"
+              ]
+            },
+            "description": "Desfaz a desativação, deixando o ambiente como estava antes de rodar esta pasta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ativa\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
