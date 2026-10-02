@@ -110,8 +110,12 @@ resource "aws_ssm_parameter" "db_password" {
   value = var.db_password
 }
 
+locals {
+  jdbc_url = "jdbc:postgresql://${aws_db_instance.this.endpoint}/${aws_db_instance.this.db_name}"
+}
+
 resource "aws_ssm_parameter" "db_url" {
   name  = "/${var.project}/${var.ambiente}/${var.nome}/db/url"
   type  = "String"
-  value = "jdbc:postgresql://${aws_db_instance.this.endpoint}/${aws_db_instance.this.db_name}"
+  value = local.jdbc_url
 }
