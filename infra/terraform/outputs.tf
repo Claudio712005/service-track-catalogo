@@ -15,7 +15,8 @@ output "db_endpoint" {
 }
 
 output "db_jdbc_url" {
-  value = aws_ssm_parameter.db_url.value
+  description = "URL JDBC sem credencial. Montada do mesmo local que alimenta o parametro no SSM; ler o parametro aqui marcaria o output como sensivel sem necessidade."
+  value       = local.jdbc_url
 }
 
 output "ssm_parameters_db" {
