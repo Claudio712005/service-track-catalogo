@@ -80,6 +80,6 @@ const insumos = [
 ];
 
 categorias.forEach(c => db.CATEGORIAS.replaceOne({ _id: c._id }, c, { upsert: true }));
-insumos.forEach(i => db.INSUMOS.replaceOne({ _id: i._id }, i, { upsert: true }));
+insumos.forEach(i => db.INSUMOS.replaceOne({ _id: i._id }, Object.assign({ VERSAO: 0 }, i), { upsert: true }));
 
 print("ST_INS seed: " + db.CATEGORIAS.countDocuments() + " categorias, " + db.INSUMOS.countDocuments() + " insumos.");
