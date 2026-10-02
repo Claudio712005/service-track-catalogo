@@ -33,8 +33,9 @@ variable "untagged_expire_days" {
 }
 
 variable "db_engine_version" {
-  type    = string
-  default = "16.4"
+  description = "Versao do Postgres. Apenas a maior: a AWS retira versoes menores de circulacao e o RDS escolhe a menor disponivel no momento da criacao."
+  type        = string
+  default     = "16"
 }
 
 variable "db_instance_class" {
