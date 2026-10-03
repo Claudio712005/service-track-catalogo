@@ -77,7 +77,7 @@ class OpenApiConfig(
                     "Identificador de correlação da operação de negócio, propagado entre serviços. " +
                         "Informe o mesmo valor em todas as chamadas do fluxo para que o rastreamento " +
                         "as agrupe; omitido, o servidor gera um. É devolvido no cabeçalho de resposta " +
-                        "de mesmo nome, ao lado de " + CorrelacaoFilter.CABECALHO_TRANSACAO +
+                        "de mesmo nome, ao lado de " + CorrelacaoFilter.CABECALHO_REQUISICAO +
                         ", que identifica esta requisição isolada."
                 )
         )
