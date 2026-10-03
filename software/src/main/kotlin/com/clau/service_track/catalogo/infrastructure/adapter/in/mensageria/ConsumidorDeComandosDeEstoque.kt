@@ -47,8 +47,9 @@ class ConsumidorDeComandosDeEstoque(
 
         try {
             log.debug(
-                "comando recebido tipo={} versao={} particao={} offset={}",
-                envelope.tipo, envelope.versao, registro.partition(), registro.offset(),
+                "comando recebido tipo={} versao={} idMensagem={} particao={} offset={}",
+                envelope.tipo, envelope.versao, envelope.idMensagem,
+                registro.partition(), registro.offset(),
             )
             metricas.comandoProcessado(envelope.tipo, despachar(envelope))
         } catch (e: MensagemInvalidaException) {
@@ -59,7 +60,7 @@ class ConsumidorDeComandosDeEstoque(
             throw e
         } finally {
             MDC.remove(CorrelacaoFilter.CHAVE_CORRELACAO)
-            MDC.remove(CorrelacaoFilter.CHAVE_TRANSACAO)
+            MDC.remove(CorrelacaoFilter.CHAVE_REQUISICAO)
         }
     }
 
@@ -129,7 +130,7 @@ class ConsumidorDeComandosDeEstoque(
             CorrelacaoFilter.CHAVE_CORRELACAO,
             envelope.correlationId ?: UUID.randomUUID().toString(),
         )
-        MDC.put(CorrelacaoFilter.CHAVE_TRANSACAO, envelope.idMensagem)
+        MDC.put(CorrelacaoFilter.CHAVE_REQUISICAO, UUID.randomUUID().toString())
     }
 
     private companion object {
