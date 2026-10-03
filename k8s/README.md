@@ -9,11 +9,12 @@ k8s/
 ├── componentes/
 │   ├── mongo-efemero/       Mongo de dado descartável, usado por local, hml e prd
 │   ├── postgres-efemero/    Postgres de dado descartável, só no local
-│   └── kafka-efemero/       Broker KRaft de nó único, só no local
+│   ├── kafka-efemero/       Broker KRaft de nó único, só no local
+│   └── nodeport/            Service NodePort 30080, por onde o NLB interno entra
 ├── overlays/
 │   ├── local/               kind, imagem local, os três bancos/broker em contêiner
-│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero, Postgres no RDS
-│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero, Postgres no RDS
+│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero, Postgres no RDS, NodePort
+│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero, Postgres no RDS, NodePort
 └── argocd/
     ├── local.yaml           Application do kind, aplicada à mão
     ├── hml.yaml             marcador de descoberta
@@ -27,6 +28,19 @@ k8s/
 | Postgres `st_cat` | `componentes/postgres-efemero` | RDS do próprio serviço, criado por `infra/terraform` |
 | Mongo `ST_INS` | `componentes/mongo-efemero` | `componentes/mongo-efemero` |
 | Broker Kafka | `componentes/kafka-efemero` | **nenhum ainda** — mensageria desligada por flag |
+
+## Como se chega neste serviço
+
+| De onde | Por onde |
+|---|---|
+| Outro pod no cluster | `http://service-track-catalogo.service-track-catalogo.svc.cluster.local` |
+| BFF, por fora do cluster | API Gateway privada da plataforma → VPC Link → NLB interno → **NodePort 30080** |
+| Internet | **de nenhuma forma**, e isso é desenho, não pendência |
+
+A porta 30080 é contrato com `service-track-aws-iac`
+(`apis/service-track-api-int/servicos-<ENV>.yaml`, `IAC-ADR-033`) e **nada valida o par**:
+mudar aqui sem mudar lá dá alvo `unhealthy` no NLB e `503` na rota, sem erro de apply.
+Detalhe em [componentes/nodeport/README.md](componentes/nodeport/README.md).
 
 A mensageria fica `SERVICETRACK_MENSAGERIA_HABILITADA=false` em `hml` e `prd` enquanto o broker
 da plataforma não existir: a escolha está aberta em `GLOBAL-RFC-010`. Desligada, o serviço sobe
