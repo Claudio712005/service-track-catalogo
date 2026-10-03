@@ -323,7 +323,7 @@ class InsumoApiControllerTest {
         mockMvc.perform(get(ROTA).header("X-Correlation-Id", "fluxo-de-teste-123"))
             .andExpect(status().isOk)
             .andExpect(header().string("X-Correlation-Id", "fluxo-de-teste-123"))
-            .andExpect(header().exists("X-Transaction-Id"))
+            .andExpect(header().exists("X-Request-Id"))
     }
 
     @Test
