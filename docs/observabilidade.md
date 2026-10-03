@@ -30,22 +30,29 @@ pode derrubar serviço, por isso nenhum deles está no `depends_on` do `catalogo
 ## A correlação, em três cliques
 
 1. No painel **Catálogo — mensageria e estoque**, o painel de log mostra a linha com
-   `trace_id`, `correlationId` e `transactionId`.
-2. O `trace_id` é um link: abre o trace no Tempo, com os spans de HTTP, JDBC, Mongo e Kafka.
+   `traceId`, `spanId`, `correlationId` e `requestId`.
+2. O `traceId` é um link: abre o trace no Tempo, com os spans de HTTP, JDBC, Mongo e Kafka.
 3. No trace, **Logs for this span** volta ao Loki filtrando por aquele trace.
 
-Isso funciona porque o agente injeta `trace_id` no MDC do Logback e exporta o log para o
-Loki como metadado estruturado. O padrão de log também carrega os três identificadores, então
-`docker compose logs catalogo` mostra a mesma correlação em texto puro:
+O padrão de log carrega os quatro identificadores, então `docker compose logs catalogo` mostra a
+mesma correlação em texto puro:
 
 ```
-[service-track-catalogo,b38ab8e91d451a12d2dc2d02a2a0982b,obs-recusa,a91cc49a-...]
+[service-track-catalogo,b38ab8e91d451a12d2dc2d02a2a0982b,751405cc0ab4a806,obs-recusa,a91cc49a-...]
 ```
 
-`correlationId` é nosso, atravessa a fila no envelope da mensagem e no cabeçalho
-`X-Correlation-Id`; `trace_id` é do OpenTelemetry e atravessa a fila no `traceparent`, que o
-agente escreve e lê sozinho. São coisas diferentes de propósito: o primeiro identifica o
-atendimento do ponto de vista do negócio, o segundo a execução técnica.
+**A chave no MDC é `traceId`, em caixa camelo** — não `trace_id`. É o que a ponte do Micrometer
+Tracing grava nesta versão, verificado em execução. O padrão deste serviço lia `%X{trace_id}` e por
+isso imprimia campo vazio em toda linha.
+
+`correlationId` é nosso, atravessa a fila no envelope da mensagem e no cabeçalho `X-Correlation-Id`;
+`traceId` é da instrumentação e atravessa a fila no `traceparent`, que o `LeitorDeEnvelope` lê. São
+coisas diferentes de propósito: o primeiro identifica o atendimento do ponto de vista do negócio, o
+segundo a execução técnica. `requestId` é a terceira coisa: identifica **uma** requisição HTTP ou
+**uma** tentativa de processar mensagem, e nunca é aceito de fora.
+
+Os três identificadores e as obrigações de cada serviço estão em `GLOBAL-ADR-006`; o que mudou aqui,
+em `CAT-ADR-003`.
 
 ## Métricas que só existem porque foram instrumentadas
 
