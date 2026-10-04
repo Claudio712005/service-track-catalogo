@@ -45,7 +45,8 @@ class EstoqueRepositoryMemoriaAdapter : EstoqueRepositoryPort, RegistroDeMensage
     override fun aplicar(alteracao: AlteracaoDeEstoque) {
         saldos[alteracao.saldo.insumoId.value] = alteracao.saldo
         movimentos += alteracao.movimento
-        processadas[alteracao.chaveDeIdempotencia] = alteracao.tipoDaMensagem
+        processadas[identidadeNoInbox(alteracao.tipoDaMensagem, alteracao.chaveDeIdempotencia)] =
+            alteracao.tipoDaMensagem
         alteracao.eventoParaPublicar?.let { eventos += it }
     }
 
@@ -54,9 +55,12 @@ class EstoqueRepositoryMemoriaAdapter : EstoqueRepositoryPort, RegistroDeMensage
         tipoDaMensagem: String,
         evento: EventoParaPublicar?,
     ) {
-        processadas[chaveDeIdempotencia] = tipoDaMensagem
+        processadas[identidadeNoInbox(tipoDaMensagem, chaveDeIdempotencia)] = tipoDaMensagem
         evento?.let { eventos += it }
     }
 
-    override fun jaProcessada(chave: String): Boolean = processadas.containsKey(chave)
+    override fun jaProcessada(tipoDaMensagem: String, chave: String): Boolean =
+        processadas.containsKey(identidadeNoInbox(tipoDaMensagem, chave))
+
+    private fun identidadeNoInbox(tipoDaMensagem: String, chave: String) = "$tipoDaMensagem:$chave"
 }

@@ -87,6 +87,18 @@ class ConsumidorDeComandosDeEstoqueTest {
     }
 
     @Test
+    fun `mesma chave em comandos diferentes aplica os dois efeitos`() {
+        val chave = UUID.randomUUID().toString()
+
+        consumidor.consumir(mensagem("RegistrarEntradaDeEstoque", entrada("40"), chave))
+        consumidor.consumir(mensagem("ReservarEstoque", reservaDe("6"), chave))
+
+        val saldo = assertNotNull(estoque.buscarSaldo(DomainId.de(OLEO)))
+        assertEquals(0, BigDecimal("34").compareTo(saldo.quantidadeDisponivel))
+        assertEquals(0, BigDecimal("6").compareTo(saldo.quantidadeReservada))
+    }
+
+    @Test
     fun `saldo insuficiente publica recusa em vez de estourar`() {
         consumidor.consumir(mensagem("RegistrarEntradaDeEstoque", entrada("2")))
         consumidor.consumir(mensagem("ReservarEstoque", reservaDe("9")))
@@ -160,10 +172,14 @@ class ConsumidorDeComandosDeEstoqueTest {
         }
     }
 
-    private fun mensagem(tipo: String, dados: String): ConsumerRecord<String, String> {
+    private fun mensagem(
+        tipo: String,
+        dados: String,
+        idMensagem: String = UUID.randomUUID().toString(),
+    ): ConsumerRecord<String, String> {
         val corpo = """
         {
-          "idMensagem": "${UUID.randomUUID()}",
+          "idMensagem": "$idMensagem",
           "tipo": "$tipo",
           "versao": 1,
           "ocorridoEm": "2026-09-27T10:00:00Z",
