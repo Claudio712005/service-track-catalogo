@@ -67,7 +67,8 @@ class EstoqueRepositoryPostgresAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun jaProcessada(chave: String): Boolean = inbox.existsById(chave)
+    override fun jaProcessada(tipoDaMensagem: String, chave: String): Boolean =
+        inbox.existsById(identidadeNoInbox(tipoDaMensagem, chave))
 
     private fun gravarSaldo(saldo: SaldoDeInsumo) {
         val existente = saldos.findById(UUID.fromString(saldo.insumoId.value)).orElse(null)
@@ -86,12 +87,14 @@ class EstoqueRepositoryPostgresAdapter(
     private fun registrar(chave: String, tipoDaMensagem: String) {
         inbox.save(
             InboxEntity(
-                id = chave,
+                id = identidadeNoInbox(tipoDaMensagem, chave),
                 tipoEvento = tipoDaMensagem,
                 dataProcessamento = OffsetDateTime.now(ZoneOffset.UTC),
             )
         )
     }
+
+    private fun identidadeNoInbox(tipoDaMensagem: String, chave: String) = "$tipoDaMensagem:$chave"
 
     private fun enfileirar(evento: EventoParaPublicar) {
         outbox.save(mapper.paraEntidade(evento))
