@@ -2,5 +2,5 @@ package com.clau.service_track.catalogo.application.port.out.mensageria
 
 interface RegistroDeMensagemPort {
 
-    fun jaProcessada(chave: String): Boolean
+    fun jaProcessada(tipoDaMensagem: String, chave: String): Boolean
 }

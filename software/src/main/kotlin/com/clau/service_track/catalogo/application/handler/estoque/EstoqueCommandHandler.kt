@@ -46,7 +46,7 @@ class EstoqueCommandHandler(
         val insumo = exigirInsumo(comando.insumoId)
         val saldo = saldoDe(insumo)
 
-        if (mensagens.jaProcessada(comando.chaveIdempotencia)) {
+        if (mensagens.jaProcessada(TIPO_ENTRADA, comando.chaveIdempotencia)) {
             log.info("entrada de estoque ja registrada, nada a fazer chaveIdempotencia={}", comando.chaveIdempotencia)
             return ResultadoDeSaldo(insumo, saldo)
         }
@@ -80,7 +80,7 @@ class EstoqueCommandHandler(
     }
 
     override fun executar(comando: ReservarEstoqueCommand): ResultadoDoPasso {
-        if (mensagens.jaProcessada(comando.chaveIdempotencia)) {
+        if (mensagens.jaProcessada(TIPO_RESERVA, comando.chaveIdempotencia)) {
             return jaProcessado(comando.chaveIdempotencia)
         }
 
@@ -110,7 +110,7 @@ class EstoqueCommandHandler(
     }
 
     override fun executar(comando: ConsumirReservaCommand): ResultadoDoPasso {
-        if (mensagens.jaProcessada(comando.chaveIdempotencia)) {
+        if (mensagens.jaProcessada(TIPO_CONSUMO, comando.chaveIdempotencia)) {
             return jaProcessado(comando.chaveIdempotencia)
         }
 
@@ -129,7 +129,7 @@ class EstoqueCommandHandler(
     }
 
     override fun executar(comando: LiberarReservaCommand): ResultadoDoPasso {
-        if (mensagens.jaProcessada(comando.chaveIdempotencia)) {
+        if (mensagens.jaProcessada(TIPO_LIBERACAO, comando.chaveIdempotencia)) {
             return jaProcessado(comando.chaveIdempotencia)
         }
 
@@ -169,7 +169,7 @@ class EstoqueCommandHandler(
         val saldo = saldoDe(insumo)
         val noAgregado = saldo.reservaAtivaDe(ordemServicoId) ?: return false
         val chave = "expiracao:${noAgregado.id.value}"
-        if (mensagens.jaProcessada(chave)) return false
+        if (mensagens.jaProcessada(TIPO_EXPIRACAO, chave)) return false
 
         val resultado = saldo.expirarReserva(noAgregado, chave)
         aplicar(insumo, saldo, resultado, TIPO_EXPIRACAO, eventos.reservaExpirada(insumo, resultado, saldo, null))
