@@ -1,6 +1,6 @@
 package com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria
 
-import com.clau.service_track.catalogo.infrastructure.adapter.config.mensageria.PropriedadesDeMensageria
+import com.clau.service_track.catalogo.infrastructure.adapter.config.mensageria.MensageriaProperties
 import com.clau.service_track.catalogo.infrastructure.adapter.out.observabilidade.MetricasDeEstoque
 import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.CorrelacaoDoEnvelope
 import com.clau.service_track.catalogo.infrastructure.adapter.out.repository.postgres.OutboxJpaRepository
@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper
 class PublicadorDeOutbox(
     private val outbox: OutboxJpaRepository,
     private val template: KafkaTemplate<String, String>,
-    private val propriedades: PropriedadesDeMensageria,
+    private val propriedades: MensageriaProperties,
     private val mapper: ObjectMapper,
     private val metricas: MetricasDeEstoque,
 ) {

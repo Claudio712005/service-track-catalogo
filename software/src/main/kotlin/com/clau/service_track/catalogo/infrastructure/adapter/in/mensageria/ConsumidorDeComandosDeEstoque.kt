@@ -39,7 +39,7 @@ class ConsumidorDeComandosDeEstoque(
 
     @KafkaListener(
         topics = ["\${servicetrack.mensageria.topico-de-comandos}"],
-        containerFactory = "fabricaDeContainerDeComandos",
+        containerFactory = "estoqueListenerContainerFactory",
     )
     fun consumir(registro: ConsumerRecord<String, String>) {
         val envelope = leitor.ler(registro)

@@ -16,7 +16,7 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar
 @EnableScheduling
 @ConditionalOnProperty(prefix = "servicetrack.mensageria", name = ["habilitada"], havingValue = "true")
 class AgendaDeMensageria(
-    private val propriedades: PropriedadesDeMensageria,
+    private val propriedades: MensageriaProperties,
     private val publicador: PublicadorDeOutbox,
     private val expiracao: ObjectProvider<RotinaDeExpiracaoDeReservas>,
 ) : SchedulingConfigurer {

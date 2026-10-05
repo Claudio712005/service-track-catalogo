@@ -15,9 +15,9 @@ import jakarta.annotation.PostConstruct
     name = ["habilitado"],
     havingValue = "false",
 )
-class SecurityConfigDesenvolvimento {
+class SecurityConfigDev {
 
-    private val log = LoggerFactory.getLogger(SecurityConfigDesenvolvimento::class.java)
+    private val log = LoggerFactory.getLogger(SecurityConfigDev::class.java)
 
     @PostConstruct
     fun avisar() {
@@ -28,7 +28,7 @@ class SecurityConfigDesenvolvimento {
     }
 
     @Bean
-    fun filterChainSemAutenticacao(http: HttpSecurity): SecurityFilterChain {
+    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }

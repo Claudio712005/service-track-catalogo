@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
 
 @ConfigurationProperties(prefix = "servicetrack.mensageria")
-data class PropriedadesDeMensageria(
+data class MensageriaProperties(
 
     val habilitada: Boolean = false,
 

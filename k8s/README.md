@@ -155,7 +155,7 @@ repositório.
   a base sobre a qual o `averageUtilization: 50%` do HPA local foi calibrado
   (50% de 100m = 50m — atingível sem gerar uma carga absurda).
 - **`SPRING_PROFILES_ACTIVE=dev`** desliga a validação de JWT
-  (`SecurityConfigDesenvolvimento`, com aviso de log na subida). Evita
+  (`SecurityConfigDev`, com aviso de log na subida). Evita
   gerenciar par de chaves RS256 só para testar deploy e escala localmente.
   Não usar em `hml` nem `prd`.
 - **`imagePullPolicy: IfNotPresent`**: a imagem é local, `kind` não deve tentar
