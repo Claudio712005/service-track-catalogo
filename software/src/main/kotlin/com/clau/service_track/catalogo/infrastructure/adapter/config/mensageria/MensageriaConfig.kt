@@ -21,22 +21,22 @@ import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.util.backoff.ExponentialBackOff
 
 @Configuration
-@EnableConfigurationProperties(PropriedadesDeMensageria::class)
+@EnableConfigurationProperties(MensageriaProperties::class)
 @ConditionalOnProperty(prefix = "servicetrack.mensageria", name = ["habilitada"], havingValue = "true")
-class ConfiguracaoDeMensageria {
+class MensageriaConfig {
 
-    private val log = LoggerFactory.getLogger(ConfiguracaoDeMensageria::class.java)
+    private val log = LoggerFactory.getLogger(MensageriaConfig::class.java)
 
     @Bean
-    fun fabricaDeContainerDeComandos(
+    fun estoqueListenerContainerFactory(
         consumidores: ConsumerFactory<String, String>,
-        propriedades: PropriedadesDeMensageria,
-        publicadorDaDlt: DeadLetterPublishingRecoverer,
+        propriedades: MensageriaProperties,
+        deadLetterPublishingRecoverer: DeadLetterPublishingRecoverer,
     ): ConcurrentKafkaListenerContainerFactory<String, String> {
         val fabrica = ConcurrentKafkaListenerContainerFactory<String, String>()
         fabrica.setConsumerFactory(consumidores)
         fabrica.setConcurrency(propriedades.concorrencia)
-        fabrica.setCommonErrorHandler(tratadorDeErro(propriedades, publicadorDaDlt))
+        fabrica.setCommonErrorHandler(tratadorDeErro(propriedades, deadLetterPublishingRecoverer))
         fabrica.containerProperties.ackMode = ContainerProperties.AckMode.RECORD
         fabrica.containerProperties.isMissingTopicsFatal = false
         fabrica.containerProperties.isObservationEnabled = true
@@ -48,16 +48,16 @@ class ConfiguracaoDeMensageria {
         MetricasDeEstoque(registro) { outbox.countByDataPublicacaoIsNull() }
 
     @Bean
-    fun publicadorDaDlt(
+    fun deadLetterPublishingRecoverer(
         template: KafkaTemplate<String, String>,
-        propriedades: PropriedadesDeMensageria,
+        propriedades: MensageriaProperties,
     ): DeadLetterPublishingRecoverer = DeadLetterPublishingRecoverer(template) { registro, _ ->
         TopicPartition(registro.topic() + propriedades.sufixoDaDlt, PARTICAO_A_CARGO_DO_BROKER)
     }
 
     private fun tratadorDeErro(
-        propriedades: PropriedadesDeMensageria,
-        publicadorDaDlt: DeadLetterPublishingRecoverer,
+        propriedades: MensageriaProperties,
+        deadLetterPublishingRecoverer: DeadLetterPublishingRecoverer,
     ): DefaultErrorHandler {
         val espera = ExponentialBackOff().apply {
             initialInterval = propriedades.esperaInicial.toMillis()
@@ -66,7 +66,7 @@ class ConfiguracaoDeMensageria {
             maxAttempts = propriedades.tentativas.toLong()
         }
 
-        return DefaultErrorHandler(publicadorDaDlt, espera).apply {
+        return DefaultErrorHandler(deadLetterPublishingRecoverer, espera).apply {
             addNotRetryableExceptions(
                 MensagemInvalidaException::class.java,
                 DomainException::class.java,

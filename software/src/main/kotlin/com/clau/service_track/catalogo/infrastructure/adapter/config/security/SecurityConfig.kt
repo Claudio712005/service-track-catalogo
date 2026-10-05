@@ -37,7 +37,7 @@ class SecurityConfig(
 ) {
 
     @Bean
-    fun filterChain(
+    fun securityFilterChain(
         http: HttpSecurity,
         @Qualifier("handlerExceptionResolver") resolvedorDeExcecao: HandlerExceptionResolver,
     ): SecurityFilterChain {

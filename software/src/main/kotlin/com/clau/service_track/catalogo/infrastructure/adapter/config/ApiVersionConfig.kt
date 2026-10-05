@@ -5,7 +5,7 @@ import org.springframework.web.servlet.config.annotation.ApiVersionConfigurer
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 @Configuration
-class ApiVersionamentoConfig : WebMvcConfigurer {
+class ApiVersionConfig : WebMvcConfigurer {
 
     override fun configureApiVersioning(configurer: ApiVersionConfigurer) {
         configurer
