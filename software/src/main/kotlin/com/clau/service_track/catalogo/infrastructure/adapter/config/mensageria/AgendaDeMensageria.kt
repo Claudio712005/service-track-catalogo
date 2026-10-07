@@ -61,7 +61,7 @@ class AgendaDeMensageria(
 
     private fun anunciarRecuperacao(tarefa: String) {
         val seguidas = falhasSeguidas.remove(tarefa)?.get() ?: return
-        log.info("tarefa periodica voltou a funcionar tarefa={} falhas anteriores={}", tarefa, seguidas)
+        log.info("tarefa periodica voltou a funcionar tarefa={} falhasAnteriores={}", tarefa, seguidas)
     }
 
     private companion object {
