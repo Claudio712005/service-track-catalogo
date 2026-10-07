@@ -53,6 +53,7 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:kafka")
+    testImplementation("com.networknt:json-schema-validator:1.5.8")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -65,6 +66,9 @@ kotlin {
 tasks.processTestResources {
     from("$rootDir/../db/postgres") {
         into("db")
+    }
+    from("$rootDir/../docs/mensageria/esquemas") {
+        into("contratos")
     }
 }
 

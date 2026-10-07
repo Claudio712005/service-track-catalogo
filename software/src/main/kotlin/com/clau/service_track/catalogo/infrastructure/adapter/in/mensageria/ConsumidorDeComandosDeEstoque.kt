@@ -16,6 +16,7 @@ import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dt
 import com.clau.service_track.catalogo.infrastructure.adapter.`in`.mensageria.dto.EnvelopeDeMensagem
 import com.clau.service_track.catalogo.infrastructure.adapter.out.observabilidade.MetricasDeEstoque
 import com.clau.service_track.catalogo.infrastructure.adapter.web.filter.CorrelacaoFilter
+import java.time.ZoneId
 import java.util.UUID
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
@@ -86,7 +87,7 @@ class ConsumidorDeComandosDeEstoque(
             insumoId = DomainId.de(dados.insumoId),
             ordemServicoId = DomainId.de(dados.ordemServicoId),
             quantidade = dados.quantidade,
-            expiraEm = dados.expiraEm,
+            expiraEm = dados.expiraEm?.atZoneSameInstant(ZoneId.systemDefault())?.toLocalDateTime(),
             chaveIdempotencia = envelope.idMensagem,
             traceId = envelope.traceId,
         )

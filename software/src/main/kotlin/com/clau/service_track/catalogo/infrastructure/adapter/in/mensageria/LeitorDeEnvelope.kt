@@ -24,7 +24,7 @@ class LeitorDeEnvelope(
 
         return envelope.copy(
             correlationId = envelope.correlationId ?: cabecalho(registro, CABECALHO_CORRELACAO),
-            traceId = envelope.traceId ?: traceDoCabecalho(registro),
+            traceId = traceDoCabecalho(registro) ?: envelope.traceId,
         )
     }
 
