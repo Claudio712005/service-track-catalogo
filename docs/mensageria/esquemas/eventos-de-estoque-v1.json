@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "servicetrack/estoque/eventos/v1",
+  "$id": "urn:servicetrack:esquema:estoque:eventos:v1",
   "title": "Eventos de estoque do catalogo, versao 1",
-  "description": "Contrato do topico servicetrack.estoque.eventos.v1. O dono e o service-track-catalogo. Evolucao e aditiva: campo novo nao muda a versao, remocao ou troca de tipo muda. Quebra de evento nao da erro HTTP, da silencio e dado errado.",
+  "description": "Contrato do topico servicetrack.estoque.eventos.v1. O dono e o service-track-catalogo; o service-track-ordens mantem copia identica como contrato de leitura. Evolucao e aditiva: campo novo e tipo novo nao mudam a versao, remocao ou troca de tipo mudam. Quebra de evento nao da erro HTTP, da silencio e dado errado.",
   "type": "object",
   "required": ["idMensagem", "tipo", "versao", "ocorridoEm", "dados"],
   "properties": {
@@ -16,6 +16,7 @@
         "EstoqueReservado",
         "ReservaRecusada",
         "EstoqueConsumido",
+        "ConsumoRecusado",
         "ReservaLiberada",
         "ReservaExpirada"
       ]
@@ -23,14 +24,31 @@
     "versao": { "type": "integer", "minimum": 1 },
     "ocorridoEm": { "type": "string", "format": "date-time" },
     "correlationId": { "type": ["string", "null"], "maxLength": 64 },
-    "traceId": { "type": ["string", "null"], "maxLength": 64 },
+    "traceId": {
+      "type": ["string", "null"],
+      "maxLength": 64,
+      "description": "Redundancia de depuracao. O trace canonico viaja no cabecalho traceparent da mensagem; este campo nao participa da correlacao de spans."
+    },
     "dados": { "type": "object" }
   },
   "allOf": [
     {
       "if": { "properties": { "tipo": { "const": "ReservaRecusada" } } },
-      "then": { "properties": { "dados": { "$ref": "#/$defs/reservaRecusada" } } },
-      "else": { "properties": { "dados": { "$ref": "#/$defs/reserva" } } }
+      "then": { "properties": { "dados": { "$ref": "#/$defs/reservaRecusada" } } }
+    },
+    {
+      "if": { "properties": { "tipo": { "const": "ConsumoRecusado" } } },
+      "then": { "properties": { "dados": { "$ref": "#/$defs/consumoRecusado" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "enum": ["EstoqueReservado", "EstoqueConsumido", "ReservaLiberada", "ReservaExpirada"]
+          }
+        }
+      },
+      "then": { "properties": { "dados": { "$ref": "#/$defs/reserva" } } }
     }
   ],
   "$defs": {
@@ -85,6 +103,19 @@
         "motivo": {
           "type": "string",
           "description": "Texto legivel com o solicitado e o disponivel. E o que a saga registra para o atendente entender a compensacao."
+        }
+      }
+    },
+    "consumoRecusado": {
+      "type": "object",
+      "required": ["insumoId", "sku", "ordemServicoId", "motivo"],
+      "properties": {
+        "insumoId": { "type": "string", "format": "uuid" },
+        "sku": { "type": "string" },
+        "ordemServicoId": { "type": "string", "format": "uuid" },
+        "motivo": {
+          "type": "string",
+          "description": "Por que o consumo nao pode ser aplicado: reserva inexistente, ja consumida ou expirada. Existe para que falha de regra de dominio no passo de consumo volte para a saga em vez de morrer na DLT, onde a saga ficaria pendurada sem resposta."
         }
       }
     }

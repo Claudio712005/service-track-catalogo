@@ -1,16 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "servicetrack/estoque/comandos/v1",
+  "$id": "urn:servicetrack:esquema:estoque:comandos:v1",
   "title": "Comandos de estoque do catalogo, versao 1",
-  "description": "Contrato do topico servicetrack.estoque.comandos.v1. O dono e o servico que publica os comandos; este arquivo e a leitura que o catalogo faz dele. Campo desconhecido em dados e ignorado, para que evolucao aditiva nao exija deploy combinado.",
+  "description": "Contrato do topico servicetrack.estoque.comandos.v1. O dono e o service-track-ordens, que publica os comandos como passos da saga; o service-track-catalogo mantem copia identica como contrato de leitura. Campo desconhecido em dados e ignorado, para que evolucao aditiva nao exija deploy combinado.",
   "type": "object",
   "required": ["idMensagem", "tipo", "ocorridoEm", "dados"],
   "properties": {
     "idMensagem": {
       "type": "string",
-      "format": "uuid",
-      "maxLength": 120,
-      "description": "Chave de idempotencia. Reentrega com o mesmo valor nao aplica efeito de novo."
+      "minLength": 1,
+      "maxLength": 94,
+      "pattern": "^[A-Za-z0-9:_-]+$",
+      "description": "Chave de idempotencia. Reentrega com o mesmo valor nao aplica efeito de novo. O formato e livre de proposito: o consumidor so precisa de unicidade. A saga usa <ordemServicoId>:<ETAPA>:<insumoId>, convencao do produtor descrita em GLOBAL-ADR-010, porque chave que nao diz a etapa custa caro em log e em DLT. O teto de 94 nao e estetico: o catalogo grava <tipo>:<idMensagem> no INBOX, cuja coluna tem 120, e o tipo mais longo tem 25 caracteres."
     },
     "tipo": {
       "enum": ["ReservarEstoque", "ConsumirReserva", "LiberarReserva", "RegistrarEntradaDeEstoque"]
@@ -18,7 +19,11 @@
     "versao": { "type": "integer", "minimum": 1, "default": 1 },
     "ocorridoEm": { "type": "string", "format": "date-time" },
     "correlationId": { "type": ["string", "null"], "maxLength": 64 },
-    "traceId": { "type": ["string", "null"], "maxLength": 64 },
+    "traceId": {
+      "type": ["string", "null"],
+      "maxLength": 64,
+      "description": "Redundancia de depuracao. O trace canonico viaja no cabecalho traceparent da mensagem; este campo nao participa da correlacao de spans."
+    },
     "dados": { "type": "object" }
   },
   "allOf": [
@@ -42,13 +47,13 @@
   "$defs": {
     "reservarEstoque": {
       "type": "object",
-      "required": ["insumoId", "ordemServicoId", "quantidade"],
+      "required": ["insumoId", "ordemServicoId", "quantidade", "expiraEm"],
       "properties": {
         "insumoId": { "type": "string", "format": "uuid" },
         "ordemServicoId": {
           "type": "string",
           "format": "uuid",
-          "description": "Tambem e a chave da mensagem no broker, o que preserva a ordem dos passos da saga."
+          "description": "Tambem e a chave da mensagem no broker, o que preserva a ordem dos passos da saga, e e o identificador da saga."
         },
         "quantidade": {
           "type": "number",
@@ -56,9 +61,9 @@
           "description": "Na unidade do insumo. Unidade nao fracionavel recusa valor com decimal."
         },
         "expiraEm": {
-          "type": ["string", "null"],
+          "type": "string",
           "format": "date-time",
-          "description": "Prazo da reserva, sem offset, em UTC. Vencido sem a saga concluir, o estoque e devolvido pela rotina de expiracao. Nulo significa sem prazo."
+          "description": "Prazo da reserva, sem offset, em UTC. Obrigatorio: quem declara o prazo e o orquestrador, nao o catalogo, e o prazo do passo da saga e sempre menor que este. Vencido sem a saga concluir, o estoque e devolvido pela rotina de expiracao do catalogo, que e rede de seguranca para saga abandonada."
         }
       }
     },
