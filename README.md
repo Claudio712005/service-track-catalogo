@@ -96,10 +96,17 @@ Garantias:
 - **Mensagem fora do contrato não é retentada.** Vai direto para a DLT, porque retentar corpo
   inválido só gasta tempo.
 
-> **O trace ainda não atravessa a fila.** O `traceId` viaja como campo do envelope e é copiado
-> para os eventos de saída, mas nenhum `traceparent` vai no cabeçalho da mensagem, então a
-> ferramenta de rastreio vê dois traces desconexos. `spring.kafka.template.observation-enabled`
-> já está ligado e foi medido como insuficiente. Detalhe e medição em `GLOBAL-ADR-007`.
+> **O trace atravessa a fila**, e há teste de regressão para isso em
+> `TraceAtravessaAFilaTest`: o produtor injeta `traceparent` com o `traceId` da origem e o
+> consumidor entra no mesmo trace, sem código de propagação nenhum. **Em teste isso exige
+> `@AutoConfigureTracing`** — o suporte de teste do Spring Boot desliga o export de trace, e as
+> beans de propagação dependem dele, então sem a anotação o propagador é no-op e a medição dá
+> falso negativo.
+>
+> **O que não amarra é a publicação da outbox**, que roda em rotina agendada, fora do span da
+> requisição que gerou o evento: o consumidor entra num trace vizinho, não no da origem. Para
+> amarrar, a outbox precisa guardar `spanId` além do `traceId`. Medição e decisão em
+> `GLOBAL-ADR-007`.
 
 Visão completa em [docs/mensageria/](docs/mensageria/).
 
