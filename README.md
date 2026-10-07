@@ -282,6 +282,37 @@ Manifestos e dependências de runtime em [k8s/README.md](k8s/README.md).
 
 ---
 
+## Convenção de nomes
+
+**Domínio e aplicação em português. Ponto de encaixe com o framework fica na linguagem do
+framework.** O radical nomeia o assunto, o sufixo nomeia o papel técnico.
+
+| Papel | Sufixo | Exemplo |
+|---|---|---|
+| `@Configuration` | `Config` | `MensageriaConfig`, `SecurityConfig`, `OpenApiConfig` |
+| `@ConfigurationProperties` | `Properties` | `MensageriaProperties`, `JwtProperties` |
+| Caso de uso de escrita | `CommandHandler` | `EstoqueCommandHandler` |
+| Caso de uso de leitura | `QueryHandler` | `InsumoQueryHandler` |
+| Filtro de servlet | `Filter` | `CorrelacaoFilter` |
+| `@RestControllerAdvice` | `ExceptionHandler` | `GlobalExceptionHandler` |
+| Exceção de domínio | `Exception` | `SaldoInsuficienteException` |
+| Mapeador | `Mapper` | `InsumoWebMapper`, `InsumoPersistenceMapper` |
+
+**Método `@Bean` se chama como o tipo que devolve**, em camelCase: `openApi`, `jwtDecoder`,
+`deadLetterPublishingRecoverer`. Duas exceções, deliberadas:
+
+- **Mais de um bean do mesmo tipo** exige nomes distintos, e aí o nome descreve o papel —
+  `exigirTokenNasOperacoes` e `documentarCorrelacao`, ambos `OperationCustomizer`.
+- **`estoqueListenerContainerFactory`** não se chama `kafkaListenerContainerFactory` de
+  propósito: esse é o nome padrão do Spring Boot, e assumi-lo faria esta fábrica substituir a
+  auto-configurada.
+
+O que **não** muda de língua: domínio, casos de uso, regras, e o que é conceito nosso e não do
+framework — `AgendaDeMensageria`, `ExpiracaoDeReservas`, `FiltroDeInsumo` (critério de consulta,
+não filtro de servlet), `MetricasDeEstoque`.
+
+---
+
 ## Fronteiras
 
 **É dono de:** serviços da oficina, categorias e insumos, saldo e reservas de estoque, o contrato
