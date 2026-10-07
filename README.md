@@ -224,10 +224,36 @@ Detalhe do que é medido e de como ler cada painel em
 100 testes de unidade e de componente, mais integração com Testcontainers para os adaptadores de
 Postgres. O CI publica o relatório de testes como artefato a cada execução.
 
-> **Lacuna conhecida:** não existe portão de cobertura neste repositório. A Fase 4 exige **80%
-> por serviço, com evidência publicada no README**, e isto ainda não está medido aqui. O
-> `service-track-usuarios-veiculos` já tem o portão com JaCoCo; replicar o mesmo desenho aqui é
-> trabalho pendente, não decisão em aberto.
+### Cobertura
+
+Portão no build: `./gradlew check` falha abaixo do mínimo. Medido em 06/10/2026 **só com os
+testes de unidade** — os `*IT` exigem Docker e elevam o número:
+
+| Métrica | Atual | Portão | Exigido pela fase |
+|---|---|---|---|
+| Linha | 65,3% | 65% | **80%** |
+| Instrução | 58,9% | 58% | **80%** |
+| Ramo | 45,9% | 45% | — |
+
+> **O portão está no piso atual, não no exigido.** Deliberado: um portão em 80% hoje deixaria o
+> build vermelho sem dizer o que fazer. No piso, impede regressão desde já, e a dívida fica
+> escrita em vez de escondida.
+
+Onde está o descoberto, em linhas faltando:
+
+| Pacote | Cobertura | Faltando |
+|---|---|---|
+| `adapter/out/mapper` | 2,0% | 197 |
+| `entity/postgres` | 0% | 133 |
+| `config/mensageria` | 0% | 86 |
+| `entity/mongo` | 0% | 74 |
+| `adapter/out/repository/mongo` | 0% | 72 |
+| `adapter/web/error` | 60,6% | 61 |
+
+O domínio está em **88,6%** e o handler de estoque em 78,6%: **a lacuna é infraestrutura, não
+regra de negócio.** O maior ganho por esforço são os mappers — 197 linhas de função pura, de
+entidade para domínio e volta, sem dependência externa. Existe **um único** `*IT` no
+repositório, então Testcontainers não fecha essa conta sozinho.
 
 O CI tem uma **guarda de segredos** que roda antes de compilar: falha se alguma chave privada
 estiver rastreada, se um PEM versionado contiver bloco privado, ou se ferramental local tiver
