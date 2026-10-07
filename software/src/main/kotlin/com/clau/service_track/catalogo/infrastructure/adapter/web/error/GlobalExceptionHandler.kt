@@ -3,6 +3,7 @@ package com.clau.service_track.catalogo.infrastructure.adapter.web.error
 import com.clau.service_track.catalogo.application.exception.RecursoNaoEncontradoException
 import com.clau.service_track.catalogo.domain.exception.ConflitoDeEstadoException
 import com.clau.service_track.catalogo.domain.exception.DomainException
+import com.clau.service_track.catalogo.infrastructure.adapter.web.filter.CorrelacaoFilter
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
 import org.slf4j.LoggerFactory
@@ -190,7 +191,7 @@ class GlobalExceptionHandler(
         e: Exception,
         requisicao: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
-        log.error("Falha não prevista em {} (traceId={})", requisicao.requestURI, fabrica.traceIdAtual(), e)
+        log.error("falha nao prevista rota={}", CorrelacaoFilter.rotaDe(requisicao), e)
         return fabrica.montar(
             status = HttpStatus.INTERNAL_SERVER_ERROR,
             codigo = CodigoErro.ERRO_INTERNO,
