@@ -11,6 +11,7 @@ import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto
 import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.EnvelopeDeSaida
 import com.clau.service_track.catalogo.infrastructure.adapter.web.filter.CorrelacaoFilter
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 import org.slf4j.MDC
@@ -64,7 +65,7 @@ class FabricaDeEventoDeEstoqueJson(
             reservaId = resultado.reserva.id.value,
             quantidade = resultado.reserva.quantidade,
             unidadeDeMedida = insumo.unidadeDeMedida.name,
-            expiraEm = resultado.reserva.expiraEm,
+            expiraEm = resultado.reserva.expiraEm?.atZone(ZoneId.systemDefault())?.toOffsetDateTime(),
             saldoDisponivel = saldo.quantidadeDisponivel,
             saldoReservado = saldo.quantidadeReservada,
         )
