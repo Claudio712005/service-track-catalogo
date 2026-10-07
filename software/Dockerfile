@@ -95,8 +95,8 @@ ENV OTEL_SERVICE_NAME=service-track-catalogo
 ENV SPRING_PROFILES_ACTIVE=prod
 
 ENV JDK_JAVA_OPTIONS="\
--XX:MaxRAMPercentage=75 \
--XX:InitialRAMPercentage=50 \
+-XX:MaxRAMPercentage=60 \
+-XX:InitialRAMPercentage=25 \
 -XX:+UseSerialGC \
 -Xshare:auto \
 -XX:SharedArchiveFile=/app/aplicacao.jsa \
