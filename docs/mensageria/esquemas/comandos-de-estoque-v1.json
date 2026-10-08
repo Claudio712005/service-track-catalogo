@@ -9,9 +9,9 @@
     "idMensagem": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 94,
+      "maxLength": 104,
       "pattern": "^[A-Za-z0-9:_-]+$",
-      "description": "Chave de idempotencia. Reentrega com o mesmo valor nao aplica efeito de novo. O formato e livre de proposito: o consumidor so precisa de unicidade. A saga usa <ordemServicoId>:<ETAPA>:<insumoId>, convencao do produtor descrita em GLOBAL-ADR-010, porque chave que nao diz a etapa custa caro em log e em DLT. O teto de 94 nao e estetico: o catalogo grava <tipo>:<idMensagem> no INBOX, cuja coluna tem 120, e o tipo mais longo tem 25 caracteres."
+      "description": "Chave de idempotencia. Reentrega com o mesmo valor nao aplica efeito de novo. O formato e livre de proposito: o consumidor so precisa de unicidade. A saga usa <ordemServicoId>:<ETAPA>:<insumoId>:<tentativa>, convencao do produtor descrita em GLOBAL-ADR-010: chave que nao diz a etapa custa caro em log e em DLT, e retentativa com a mesma chave seria engolida pelo INBOX do destino, para quem a mensagem ja foi processada. O teto depende do tipo, porque o catalogo grava <tipo>:<idMensagem> no INBOX, cuja coluna tem 120. Aqui vale o teto dos comandos de saga; RegistrarEntradaDeEstoque aperta para 94 mais abaixo."
     },
     "tipo": {
       "enum": ["ReservarEstoque", "ConsumirReserva", "LiberarReserva", "RegistrarEntradaDeEstoque"]
@@ -41,7 +41,15 @@
     },
     {
       "if": { "properties": { "tipo": { "const": "RegistrarEntradaDeEstoque" } } },
-      "then": { "properties": { "dados": { "$ref": "#/$defs/entradaDeEstoque" } } }
+      "then": {
+        "properties": {
+          "idMensagem": {
+            "maxLength": 94,
+            "description": "Entrada de estoque e acao humana, nao passo de saga: a chave e um UUID. O teto cai para 94 porque este e o tipo mais longo e o INBOX guarda <tipo>:<idMensagem> em 120 caracteres."
+          },
+          "dados": { "$ref": "#/$defs/entradaDeEstoque" }
+        }
+      }
     }
   ],
   "$defs": {
