@@ -40,7 +40,7 @@ Todo comando e todo evento têm a mesma casca. O corpo específico vive em `dado
 
 | Campo | Para que serve |
 |---|---|
-| `idMensagem` | **chave de idempotência**. É o que impede o efeito duplicado quando a mesma mensagem é entregue duas vezes. Teto de 94 caracteres, porque o INBOX guarda `<tipo>:<idMensagem>` em 120 |
+| `idMensagem` | **chave de idempotência**. É o que impede o efeito duplicado quando a mesma mensagem é entregue duas vezes. O teto depende do tipo, porque o INBOX guarda `<tipo>:<idMensagem>` em 120: 104 para comando de saga, **94** para `RegistrarEntradaDeEstoque`, que é o tipo mais longo |
 | `tipo` | qual comando ou evento é. Tipo desconhecido vai para a DLT, sem retentativa |
 | `versao` | versão do contrato. Campo novo **não** muda a versão; remoção ou mudança de tipo muda |
 | `ocorridoEm` | instante do fato, em UTC com offset |
@@ -186,8 +186,24 @@ documentação que envelhece em silêncio: ele entra no classpath de teste a par
 | um evento mutilado é recusado | prova que a validação roda; esquema carregado errado aceita tudo em silêncio |
 | a chave da saga cabe em `INBOX.ID`, lido por reflexão da entidade | é o orçamento que atravessa dois repositórios e que nada mais valida |
 | campo desconhecido em `dados` passa | é o que torna a evolução aditiva possível sem deploy combinado |
+| cada tipo tem seu teto de `idMensagem`, e a soma com o prefixo cabe em `INBOX.ID` | o orçamento atravessa dois repositórios e nada mais o valida |
 | `traceparent` do cabeçalho vence o `traceId` do envelope | define qual dos dois é o canônico, e eles divergem |
 
 O esquema aceita **menos** do que o consumidor, de propósito, em um ponto: `expiraEm` é
 obrigatório no contrato e opcional no código. Apertar o contrato sem apertar o consumidor é o
 que permite ao orquestrador ser corrigido sem combinar deploy com este serviço.
+
+## A chave de idempotência carrega a tentativa
+
+Desde 07/10/2026 a chave da saga é `<ordemServicoId>:<ETAPA>:<insumoId>:<tentativa>`.
+
+O motivo está deste lado: **o INBOX considera processada qualquer reentrega com a mesma chave**,
+e isso inclui a recusa, que é resposta de negócio bem-sucedida e portanto fica registrada. Um
+orquestrador que retentasse `ConsumirReserva` depois de reposição de estoque, com a chave da
+primeira tentativa, receberia silêncio: este serviço responderia "já processei" e não faria
+nada. A saga ficaria esperando para sempre.
+
+O teto do `idMensagem` passou a depender do tipo, porque o prefixo que entra no INBOX depende
+dele. `RegistrarEntradaDeEstoque`, que é o tipo mais longo e é ação humana com chave UUID,
+aperta em 94; os comandos de saga cabem em 104. `ContratoDeComandosDeEstoqueTest` confere a
+aritmética de cada tipo contra o tamanho real da coluna.

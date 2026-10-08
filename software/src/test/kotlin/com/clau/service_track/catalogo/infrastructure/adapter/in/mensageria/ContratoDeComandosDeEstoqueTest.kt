@@ -106,41 +106,61 @@ class ContratoDeComandosDeEstoqueTest {
     }
 
     @Test
-    fun `chave da saga passa pelo esquema e cabe no INBOX`() {
-        val chave = "$ordem:LIBERACAO_DE_INSUMOS:$insumo"
-        assertEquals(94, chave.length, "a etapa mais longa da saga e o pior caso do orcamento")
+    fun `chave da saga com tentativa passa pelo esquema e cabe no INBOX`() {
+        val chave = "$ordem:LIBERACAO_DE_INSUMOS:$insumo:99"
+        assertEquals(97, chave.length, "a etapa mais longa da saga e o pior caso do orcamento")
 
         exigirConforme(envelope("ReservarEstoque", reservar, idMensagem = chave))
 
-        val tetoDoInbox = InboxEntity::class.java
-            .getDeclaredField("id")
-            .getAnnotation(Column::class.java)
-            .length
-
         assertTrue(
-            "LiberarReserva:$chave".length <= tetoDoInbox,
-            "chave de ${chave.length} com prefixo do tipo nao cabe em INBOX.ID($tetoDoInbox)",
+            "ReservarEstoque:$chave".length <= tetoDoInbox(),
+            "chave de ${chave.length} com prefixo do tipo nao cabe em INBOX.ID(${tetoDoInbox()})",
         )
     }
 
     @Test
-    fun `nenhum tipo do esquema estoura o INBOX no limite do idMensagem`() {
+    fun `nenhum tipo do esquema estoura o INBOX no proprio teto`() {
         val raiz = mapper.readTree(javaClass.getResourceAsStream(EsquemasDeEstoque.COMANDOS))
-        val teto = raiz["properties"]["idMensagem"]["maxLength"].asInt()
+        val tetoGeral = raiz["properties"]["idMensagem"]["maxLength"].asInt()
         val tipos = raiz["properties"]["tipo"]["enum"].values().map { it.asString() } + "ExpirarReserva"
 
-        val tetoDoInbox = InboxEntity::class.java
-            .getDeclaredField("id")
-            .getAnnotation(Column::class.java)
-            .length
-
         tipos.forEach { tipo ->
+            val teto = tetoDeclaradoPara(raiz, tipo) ?: tetoGeral
             assertTrue(
-                tipo.length + 1 + teto <= tetoDoInbox,
-                "tipo $tipo com idMensagem de $teto estoura INBOX.ID($tetoDoInbox)",
+                tipo.length + 1 + teto <= tetoDoInbox(),
+                "tipo $tipo com idMensagem de $teto estoura INBOX.ID(${tetoDoInbox()})",
             )
         }
     }
+
+    @Test
+    fun `entrada de estoque tem teto proprio, porque e o tipo mais longo`() {
+        val raiz = mapper.readTree(javaClass.getResourceAsStream(EsquemasDeEstoque.COMANDOS))
+
+        assertEquals(94, tetoDeclaradoPara(raiz, "RegistrarEntradaDeEstoque"))
+        assertEquals(120, "RegistrarEntradaDeEstoque".length + 1 + 94)
+
+        val chaveLonga = "a".repeat(95)
+        assertTrue(
+            EsquemasDeEstoque.violacoes(esquema, envelope("RegistrarEntradaDeEstoque", entrada, chaveLonga))
+                .isNotEmpty(),
+            "chave de 95 caracteres com este tipo estouraria o INBOX e tem de ser recusada",
+        )
+    }
+
+    private fun tetoDoInbox(): Int = InboxEntity::class.java
+        .getDeclaredField("id")
+        .getAnnotation(Column::class.java)
+        .length
+
+    private fun tetoDeclaradoPara(raiz: tools.jackson.databind.JsonNode, tipo: String): Int? = raiz["allOf"]
+        .values()
+        .firstOrNull { it["if"]["properties"]["tipo"]["const"]?.asString() == tipo }
+        ?.get("then")
+        ?.get("properties")
+        ?.get("idMensagem")
+        ?.get("maxLength")
+        ?.asInt()
 
     @Test
     fun `esquema recusa reserva sem prazo, e o consumidor aceita de proposito`() {
