@@ -22,6 +22,7 @@ import com.clau.service_track.catalogo.application.port.out.repository.InsumoRep
 import com.clau.service_track.catalogo.domain.model.Insumo
 import com.clau.service_track.catalogo.domain.model.ResultadoDeReserva
 import com.clau.service_track.catalogo.domain.model.SaldoDeInsumo
+import com.clau.service_track.catalogo.domain.exception.ConflitoDeEstadoException
 import com.clau.service_track.catalogo.domain.model.SaldoInsuficienteException
 import com.clau.service_track.catalogo.domain.vo.DomainId
 import com.clau.service_track.catalogo.shared.annotation.UseCase
@@ -116,7 +117,22 @@ class EstoqueCommandHandler(
 
         val insumo = exigirInsumo(comando.insumoId)
         val saldo = saldoDe(insumo)
-        val resultado = saldo.consumirReserva(comando.ordemServicoId, comando.chaveIdempotencia)
+
+        val resultado = try {
+            saldo.consumirReserva(comando.ordemServicoId, comando.chaveIdempotencia)
+        } catch (e: ConflitoDeEstadoException) {
+            val motivo = e.message ?: "nenhuma reserva ativa deste insumo para a ordem de servico"
+            log.warn(
+                "consumo recusado insumoId={} sku={} ordemServicoId={} motivo={}",
+                insumo.id.value, insumo.sku, comando.ordemServicoId.value, motivo,
+            )
+            estoque.registrarSemEfeito(
+                chaveDeIdempotencia = comando.chaveIdempotencia,
+                tipoDaMensagem = TIPO_CONSUMO,
+                evento = eventos.consumoRecusado(insumo, comando, motivo),
+            )
+            return ResultadoDoPasso.recusado(motivo)
+        }
 
         aplicar(insumo, saldo, resultado, TIPO_CONSUMO, eventos.estoqueConsumido(insumo, resultado, saldo, comando.traceId))
 

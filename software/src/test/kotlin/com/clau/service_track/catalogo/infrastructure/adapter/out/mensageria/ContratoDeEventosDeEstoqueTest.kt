@@ -1,5 +1,6 @@
 package com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria
 
+import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ConsumirReservaCommand
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueCommand
 import com.clau.service_track.catalogo.domain.model.CategoriaDeInsumo
 import com.clau.service_track.catalogo.domain.model.Insumo
@@ -137,7 +138,7 @@ class ContratoDeEventosDeEstoqueTest {
     }
 
     @Test
-    fun `ConsumoRecusado esta no contrato antes de existir no codigo`() {
+    fun `ConsumoRecusado confere com o esquema publicado`() {
         val tipos = mapper
             .readTree(javaClass.getResourceAsStream(EsquemasDeEstoque.EVENTOS))["properties"]["tipo"]["enum"]
             .values()
@@ -146,24 +147,21 @@ class ContratoDeEventosDeEstoqueTest {
         assertEquals(6, tipos.size, "tipos publicados: $tipos")
         assertTrue("ConsumoRecusado" in tipos, "tipos publicados: $tipos")
 
-        val evento = """
-            {
-              "idMensagem": "${DomainId.gerar().value}",
-              "tipo": "ConsumoRecusado",
-              "versao": 1,
-              "ocorridoEm": "2026-10-06T14:05:00Z",
-              "correlationId": "atendimento-88213",
-              "traceId": "$TRACE",
-              "dados": {
-                "insumoId": "${insumo.id.value}",
-                "sku": "OLEO-5W30",
-                "ordemServicoId": "${ordem.value}",
-                "motivo": "reserva inexistente ou ja consumida"
-              }
-            }
-        """.trimIndent()
+        val comando = ConsumirReservaCommand(
+            insumoId = insumo.id,
+            ordemServicoId = ordem,
+            chaveIdempotencia = "${ordem.value}:CONSUMO_DE_INSUMOS:${insumo.id.value}:1",
+            traceId = TRACE,
+        )
 
-        exigirConforme(evento)
+        val evento = fabrica().consumoRecusado(
+            insumo,
+            comando,
+            "Nenhuma reserva ativa deste insumo para a ordem de servico ${ordem.value}",
+        )
+
+        exigirConforme(evento.payload)
+        assertEquals(ordem.value, evento.chaveDeParticao)
     }
 
     @Test
