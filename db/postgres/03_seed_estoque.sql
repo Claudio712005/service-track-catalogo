@@ -1,0 +1,9 @@
+SET SEARCH_PATH TO CATALOGO;
+
+INSERT INTO ESTOQUE_SALDOS (INSUMO_ID, QUANTIDADE_DISPONIVEL, QUANTIDADE_RESERVADA, ESTOQUE_MINIMO, UNIDADE_MEDIDA, VERSAO, DATA_ATUALIZACAO) VALUES
+    ('018f30bb-77a1-7c22-9b10-2a44de81f0aa', 48.0000, 0.0000, 12.0000, 'LITRO', 0, '2026-03-12T09:00:00Z'),
+    ('018f30c4-1d55-7a98-8f03-7bb1c2e4d5f6', 16.0000, 0.0000, 4.0000, 'UNIDADE', 0, '2026-03-12T09:00:00Z'),
+    ('018f30d0-9e11-7b44-9c55-3ad2f1b0e7c8', 0.0000, 0.0000, 0.0000, 'LITRO', 0, '2026-03-12T09:00:00Z')
+ON CONFLICT (INSUMO_ID) DO NOTHING;
+
+COMMENT ON TABLE ESTOQUE_SALDOS IS 'Saldo por insumo. O seed abre com saldo para os insumos ativos e mantem OL-20W50-MIN-1L em zero de proposito: ele e o gatilho de falha da saga, usado para demonstrar compensacao sem mexer em ambiente ao vivo.';

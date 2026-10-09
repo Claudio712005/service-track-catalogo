@@ -112,6 +112,38 @@ class ConsumidorDeComandosDeEstoqueTest {
     }
 
     @Test
+    fun `consumo sem reserva ativa publica recusa em vez de ir para a DLT`() {
+        consumidor.consumir(mensagem("RegistrarEntradaDeEstoque", entrada("10")))
+        consumidor.consumir(mensagem("ConsumirReserva", reserva()))
+
+        val recusa = assertNotNull(estoque.eventos.lastOrNull())
+        assertEquals("ConsumoRecusado", recusa.tipoEvento)
+        assertTrue(recusa.payload.contains("Nenhuma reserva ativa"))
+
+        val saldo = assertNotNull(estoque.buscarSaldo(DomainId.de(OLEO)))
+        assertEquals(0, BigDecimal("10").compareTo(saldo.quantidadeDisponivel))
+    }
+
+    @Test
+    fun `consumo de reserva ja consumida publica recusa, nao baixa de novo`() {
+        consumidor.consumir(mensagem("RegistrarEntradaDeEstoque", entrada("10")))
+        consumidor.consumir(mensagem("ReservarEstoque", reservaDe("4")))
+        consumidor.consumir(mensagem("ConsumirReserva", reserva()))
+
+        val disponivelApos = assertNotNull(estoque.buscarSaldo(DomainId.de(OLEO))).quantidadeDisponivel
+
+        consumidor.consumir(mensagem("ConsumirReserva", reserva()))
+
+        val recusa = assertNotNull(estoque.eventos.lastOrNull())
+        assertEquals("ConsumoRecusado", recusa.tipoEvento)
+        assertEquals(
+            0,
+            disponivelApos.compareTo(assertNotNull(estoque.buscarSaldo(DomainId.de(OLEO))).quantidadeDisponivel),
+            "consumo repetido nao pode baixar estoque duas vezes",
+        )
+    }
+
+    @Test
     fun `ciclo completo reserva e consumo deixa o disponivel baixado`() {
         consumidor.consumir(mensagem("RegistrarEntradaDeEstoque", entrada("40")))
         consumidor.consumir(mensagem("ReservarEstoque", reservaDe("6")))

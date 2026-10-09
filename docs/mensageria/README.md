@@ -149,6 +149,25 @@ não melhora com espera — ocupa o consumidor e atrasa as mensagens boas atrás
 Desligada, nenhum bean de mensageria é criado — nem consumidor, nem publicador, nem agenda.
 É o que permite rodar os testes e subir o serviço num ambiente sem broker.
 
+## O gatilho de falha da saga
+
+O seed de `ESTOQUE_SALDOS` abre com saldo para os insumos ativos e deixa **um** em zero, de
+propósito:
+
+| SKU | Saldo inicial | Para que serve |
+|---|---|---|
+| `OL-5W30-SYN-1L` | 48 LITRO | caminho normal da saga |
+| `PN-205-55-R16` | 16 UNIDADE | caminho normal da saga |
+| `OL-20W50-MIN-1L` | **0** | **gatilho de falha**: toda reserva dele é recusada |
+
+Reservar o insumo de saldo zero devolve `ReservaRecusada`, o que leva o orquestrador a liberar
+as reservas que deram certo e cancelar a ordem. É o roteiro da compensação, e não depende de
+mexer em infraestrutura durante uma apresentação.
+
+**Até 07/10/2026 não havia seed de saldo nenhum**, então toda reserva era recusada e o caminho
+de sucesso só existia depois de uma entrada de estoque manual. O gatilho era acidental; agora é
+declarado, e o caminho normal funciona desde o primeiro start.
+
 ## Como exercitar na mão
 
 Com o serviço em pé e um broker acessível:
