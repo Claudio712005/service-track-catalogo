@@ -123,6 +123,16 @@ Falha do publicador é registrada uma vez em `ERROR`, depois esparsamente em `WA
 recuperação é anunciada em `INFO`. Sem isso, uma queda de dez minutos renderia centenas de
 linhas iguais.
 
+**`spring.kafka.admin.fail-fast` não deve ser ligado aqui.** Ele reverteria as duas decisões
+acima por efeito colateral: derruba a subida quando o broker está indisponível, e o broker sobe
+com `strategy: Recreate` e sem volume, então um restart dele passaria a derrubar este serviço.
+Foi implementado, medido contra esta seção e descartado — item 6 do `GLOBAL-ADR-011`.
+
+**O que continua em aberto:** mensageria ligada com `KAFKA_BOOTSTRAP_SERVERS` **ausente** é
+indistinguível de broker fora do ar, e cai no default `localhost:9092` em silêncio. Hoje o único
+sinal é a métrica de backlog da OUTBOX. Distinguir configuração ausente de broker inacessível é
+trabalho pendente.
+
 ## Retentativa e DLT
 
 | Situação | Comportamento |
