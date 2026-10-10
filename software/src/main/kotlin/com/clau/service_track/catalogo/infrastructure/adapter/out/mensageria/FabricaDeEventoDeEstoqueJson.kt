@@ -1,11 +1,13 @@
 package com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria
 
+import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ConsumirReservaCommand
 import com.clau.service_track.catalogo.application.port.`in`.useCase.estoque.ReservarEstoqueCommand
 import com.clau.service_track.catalogo.application.port.out.mensageria.FabricaDeEventoDeEstoquePort
 import com.clau.service_track.catalogo.application.port.out.repository.EventoParaPublicar
 import com.clau.service_track.catalogo.domain.model.Insumo
 import com.clau.service_track.catalogo.domain.model.ResultadoDeReserva
 import com.clau.service_track.catalogo.domain.model.SaldoDeInsumo
+import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.DadosDeConsumoRecusado
 import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.DadosDeReservaDeEstoque
 import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.DadosDeReservaRecusada
 import com.clau.service_track.catalogo.infrastructure.adapter.out.mensageria.dto.EnvelopeDeSaida
@@ -49,6 +51,20 @@ class FabricaDeEventoDeEstoqueJson(
             motivo = motivo,
         )
         return empacotar(RESERVA_RECUSADA, insumo, comando.ordemServicoId.value, dados, comando.traceId)
+    }
+
+    override fun consumoRecusado(
+        insumo: Insumo,
+        comando: ConsumirReservaCommand,
+        motivo: String,
+    ): EventoParaPublicar {
+        val dados = DadosDeConsumoRecusado(
+            insumoId = insumo.id.value,
+            sku = insumo.sku,
+            ordemServicoId = comando.ordemServicoId.value,
+            motivo = motivo,
+        )
+        return empacotar(CONSUMO_RECUSADO, insumo, comando.ordemServicoId.value, dados, comando.traceId)
     }
 
     private fun evento(
@@ -110,5 +126,6 @@ class FabricaDeEventoDeEstoqueJson(
         const val RESERVA_LIBERADA = "ReservaLiberada"
         const val RESERVA_EXPIRADA = "ReservaExpirada"
         const val RESERVA_RECUSADA = "ReservaRecusada"
+        const val CONSUMO_RECUSADO = "ConsumoRecusado"
     }
 }
