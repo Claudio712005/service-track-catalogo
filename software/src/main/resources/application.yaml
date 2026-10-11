@@ -25,7 +25,7 @@ spring:
   mongodb:
     uri: ${ST_INS_MONGO_URI}
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
     client-id: ${spring.application.name}
     consumer:
       group-id: ${servicetrack.mensageria.grupo}
@@ -124,6 +124,8 @@ spring:
     password: ${ST_CAT_DB_PASSWORD:st_cat_local}
   mongodb:
     uri: ${ST_INS_MONGO_URI:mongodb://localhost:27017/ST_INS?serverSelectionTimeoutMS=2000&connectTimeoutMS=2000}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
 servicetrack:
   mensageria:
