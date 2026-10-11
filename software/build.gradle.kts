@@ -54,6 +54,7 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:kafka")
     testImplementation("com.networknt:json-schema-validator:1.5.8")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
