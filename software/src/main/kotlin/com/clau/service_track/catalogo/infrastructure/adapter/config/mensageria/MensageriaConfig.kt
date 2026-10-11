@@ -9,6 +9,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.common.TopicPartition
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.kafka.autoconfigure.KafkaProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -23,9 +24,19 @@ import org.springframework.util.backoff.ExponentialBackOff
 @Configuration
 @EnableConfigurationProperties(MensageriaProperties::class)
 @ConditionalOnProperty(prefix = "servicetrack.mensageria", name = ["habilitada"], havingValue = "true")
-class MensageriaConfig {
+class MensageriaConfig(kafka: KafkaProperties) {
 
     private val log = LoggerFactory.getLogger(MensageriaConfig::class.java)
+
+    init {
+        if (kafka.bootstrapServers.none { it.isNotBlank() }) {
+            throw IllegalStateException(
+                "mensageria ligada sem KAFKA_BOOTSTRAP_SERVERS: o endereco do broker nao foi " +
+                    "informado. Isto e configuracao ausente, nao broker fora do ar — broker " +
+                    "indisponivel nao impede a subida, por desenho.",
+            )
+        }
+    }
 
     @Bean
     fun estoqueListenerContainerFactory(
