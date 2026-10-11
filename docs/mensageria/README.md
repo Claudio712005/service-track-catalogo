@@ -128,10 +128,17 @@ acima por efeito colateral: derruba a subida quando o broker está indisponível
 com `strategy: Recreate` e sem volume, então um restart dele passaria a derrubar este serviço.
 Foi implementado, medido contra esta seção e descartado — item 6 do `GLOBAL-ADR-011`.
 
-**O que continua em aberto:** mensageria ligada com `KAFKA_BOOTSTRAP_SERVERS` **ausente** é
-indistinguível de broker fora do ar, e cai no default `localhost:9092` em silêncio. Hoje o único
-sinal é a métrica de backlog da OUTBOX. Distinguir configuração ausente de broker inacessível é
-trabalho pendente.
+**Configuração ausente é outra coisa, e essa impede a subida.** `KAFKA_BOOTSTRAP_SERVERS` não
+tem default fora do perfil `dev`, e a configuração de mensageria recusa endereço em branco com a
+variável nomeada no erro. A diferença que importa:
+
+| Situação | Comportamento |
+|---|---|
+| Endereço não informado | a aplicação **não sobe** — é configuração errada, e é permanente |
+| Endereço informado, broker inacessível | sobe e atende HTTP, pelas duas decisões acima |
+
+Antes disso, mensageria ligada sem endereço caía em `localhost:9092` e virava retentativa
+infinita com a OUTBOX crescendo em silêncio.
 
 ## Retentativa e DLT
 
@@ -149,7 +156,7 @@ não melhora com espera — ocupa o consumidor e atrasa as mensagens boas atrás
 | Variável | Padrão | Efeito |
 |---|---|---|
 | `SERVICETRACK_MENSAGERIA_HABILITADA` | `false` | liga consumidor, publicador do outbox e rotina de expiração |
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | endereço do broker |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` só no perfil `dev` | endereço do broker; **obrigatório** quando a mensageria está ligada |
 | `SERVICETRACK_MENSAGERIA_GRUPO` | `catalogo-estoque` | grupo de consumo |
 | `SERVICETRACK_TOPICO_COMANDOS` | `servicetrack.estoque.comandos.v1` | tópico de entrada |
 | `SERVICETRACK_TOPICO_EVENTOS` | `servicetrack.estoque.eventos.v1` | tópico de saída |

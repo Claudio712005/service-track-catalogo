@@ -162,7 +162,7 @@ Nada tem valor fixo de ambiente no código. O que não tem padrão é obrigatór
 | `ST_INS_MONGO_URI` | — | URI do MongoDB `ST_INS` |
 | `SERVICETRACK_JWT_CHAVE_PUBLICA` | `file:/keys/publicKey.pem` | chave pública RS256 que valida o token |
 | `SERVICETRACK_MENSAGERIA_HABILITADA` | `false` | liga consumidor, publicador e expiração |
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | broker |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` só no perfil `dev` | broker; obrigatório com a mensageria ligada |
 | `SERVICETRACK_MENSAGERIA_GRUPO` | `catalogo-estoque` | grupo de consumo |
 | `SERVICETRACK_TOPICO_COMANDOS` | `servicetrack.estoque.comandos.v1` | tópico de entrada |
 | `SERVICETRACK_TOPICO_EVENTOS` | `servicetrack.estoque.eventos.v1` | tópico de saída |
