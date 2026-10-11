@@ -27,7 +27,7 @@ k8s/
 |---|---|---|
 | Postgres `st_cat` | `componentes/postgres-efemero` | RDS do próprio serviço, criado por `infra/terraform` |
 | Mongo `ST_INS` | `componentes/mongo-efemero` | `componentes/mongo-efemero` |
-| Broker Kafka | `componentes/kafka-efemero` | **nenhum ainda** — mensageria desligada por flag |
+| Broker Kafka | `componentes/kafka-efemero` | **broker do `service-track-ordens`**, por FQDN (`GLOBAL-ADR-011`) — este serviço não hospeda broker em ambiente compartilhado |
 
 ## Como se chega neste serviço
 
@@ -42,10 +42,27 @@ A porta 30080 é contrato com `service-track-aws-iac`
 mudar aqui sem mudar lá dá alvo `unhealthy` no NLB e `503` na rota, sem erro de apply.
 Detalhe em [componentes/nodeport/README.md](componentes/nodeport/README.md).
 
-A mensageria fica `SERVICETRACK_MENSAGERIA_HABILITADA=false` em `hml` e `prd` enquanto o broker
-da plataforma não existir: a escolha está aberta em `GLOBAL-RFC-010`. Desligada, o serviço sobe
-e atende HTTP normalmente, sem consumidor, publicador nem rotina de expiração. Ligar é trocar
-a flag e apontar `KAFKA_BOOTSTRAP_SERVERS` — nada de código.
+## O broker não é deste serviço
+
+A mensageria está **ligada** em `hml` e `prd` desde 10/10/2026, contra o broker do
+`service-track-ordens` (`GLOBAL-ADR-011`). Quem orquestra a saga hospeda a fila; este serviço
+participa.
+
+```
+KAFKA_BOOTSTRAP_SERVERS=service-track-ordens-kafka.service-track-ordens.svc.cluster.local:9092
+```
+
+**O FQDN não é preciosismo.** Cliente Kafka conecta no bootstrap e **reconecta no endereço que o
+broker anuncia**. Enquanto o broker anunciava nome curto, apontar para ele de outro namespace
+conectava e travava no metadata, com erro que não diz o que é. Os dois valores — este e o
+`KAFKA_ADVERTISED_LISTENERS` no repositório do `ordens` — têm de ser FQDN, e **nada valida o
+par**: igual ao par porta/NodePort.
+
+O overlay `local` continua com broker próprio, de propósito: ele existe para subir este
+repositório sozinho. Divergência contra a `GLOBAL-RFC-007`, declarada no ADR.
+
+Desligar a mensageria segue possível pela flag, e o serviço sobe e atende HTTP sem consumidor,
+publicador nem rotina de expiração.
 
 ## Credencial do banco não vem do ConfigMap
 

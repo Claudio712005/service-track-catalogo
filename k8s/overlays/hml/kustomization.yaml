@@ -27,5 +27,6 @@ configMapGenerator:
       - ST_INS_MONGO_URI=mongodb://service-track-catalogo-mongo:27017/ST_INS
       - ST_CAT_DB_POOL_MAX=10
       - ST_CAT_DB_POOL_MIN=2
-      - SERVICETRACK_MENSAGERIA_HABILITADA=false
+      - SERVICETRACK_MENSAGERIA_HABILITADA=true
+      - KAFKA_BOOTSTRAP_SERVERS=service-track-ordens-kafka.service-track-ordens.svc.cluster.local:9092
       - OTEL_JAVAAGENT_ENABLED=false
