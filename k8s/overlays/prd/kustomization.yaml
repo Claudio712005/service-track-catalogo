@@ -8,7 +8,6 @@ resources:
 
 components:
   - ../../componentes/mongo-efemero
-  - ../../componentes/nodeport
 
 images:
   - name: servicetrack-catalogo
