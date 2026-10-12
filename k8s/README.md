@@ -10,11 +10,10 @@ k8s/
 │   ├── mongo-efemero/       Mongo de dado descartável, usado por local, hml e prd
 │   ├── postgres-efemero/    Postgres de dado descartável, só no local
 │   ├── kafka-efemero/       Broker KRaft de nó único, só no local
-│   └── nodeport/            Service NodePort 30080, por onde o NLB interno entra
 ├── overlays/
 │   ├── local/               kind, imagem local, os três bancos/broker em contêiner
-│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero, Postgres no RDS, NodePort
-│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero, Postgres no RDS, NodePort
+│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero, Postgres no RDS
+│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero, Postgres no RDS
 └── argocd/
     ├── local.yaml           Application do kind, aplicada à mão
     ├── hml.yaml             marcador de descoberta
@@ -33,14 +32,13 @@ k8s/
 
 | De onde | Por onde |
 |---|---|
-| Outro pod no cluster | `http://service-track-catalogo.service-track-catalogo.svc.cluster.local` |
-| BFF, por fora do cluster | API Gateway privada da plataforma → VPC Link → NLB interno → **NodePort 30080** |
-| Internet | **de nenhuma forma**, e isso é desenho, não pendência |
+| Outro pod no cluster, inclusive o BFF | `http://service-track-catalogo.service-track-catalogo.svc.cluster.local` |
+| Internet, ou qualquer gateway | **de nenhuma forma**, e isso é desenho, não pendência |
 
-A porta 30080 é contrato com `service-track-aws-iac`
-(`apis/service-track-api-int/servicos-<ENV>.yaml`, `IAC-ADR-033`) e **nada valida o par**:
-mudar aqui sem mudar lá dá alvo `unhealthy` no NLB e `503` na rota, sem erro de apply.
-Detalhe em [componentes/nodeport/README.md](componentes/nodeport/README.md).
+**Não há NodePort em `hml` nem `prd` desde 12/10/2026.** A `IAC-ADR-035` removeu a API Gateway
+privada e as rotas por microsserviço: só o BFF é alcançável por gateway, e o BFF chama este
+serviço pelo DNS do cluster. Um NodePort sem quem o chame é porta aberta no nó sem função, então
+saiu — e com ele o par porta/serviço que atravessava dois repositórios e que nada validava.
 
 ## O broker não é deste serviço
 
@@ -56,7 +54,7 @@ KAFKA_BOOTSTRAP_SERVERS=service-track-ordens-kafka.service-track-ordens.svc.clus
 broker anuncia**. Enquanto o broker anunciava nome curto, apontar para ele de outro namespace
 conectava e travava no metadata, com erro que não diz o que é. Os dois valores — este e o
 `KAFKA_ADVERTISED_LISTENERS` no repositório do `ordens` — têm de ser FQDN, e **nada valida o
-par**: igual ao par porta/NodePort.
+par**: trocar num repositório não quebra o outro, quebra o apply.
 
 O overlay `local` continua com broker próprio, de propósito: ele existe para subir este
 repositório sozinho. Divergência contra a `GLOBAL-RFC-007`, declarada no ADR.
