@@ -54,6 +54,7 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:kafka")
     testImplementation("com.networknt:json-schema-validator:1.5.8")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -101,17 +102,17 @@ tasks.jacocoTestCoverageVerification {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "0.65".toBigDecimal()
+                minimum = "0.80".toBigDecimal()
             }
             limit {
                 counter = "INSTRUCTION"
                 value = "COVEREDRATIO"
-                minimum = "0.58".toBigDecimal()
+                minimum = "0.80".toBigDecimal()
             }
             limit {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
-                minimum = "0.45".toBigDecimal()
+                minimum = "0.60".toBigDecimal()
             }
         }
     }

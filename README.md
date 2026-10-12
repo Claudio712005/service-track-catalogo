@@ -233,40 +233,35 @@ Postgres. O CI publica o relatório de testes como artefato a cada execução.
 
 ### Cobertura
 
-Portão no build: `./gradlew check` falha abaixo do mínimo. Medido em 06/10/2026 **só com os
-testes de unidade** — os `*IT` exigem Docker e elevam o número:
+Portão no build: `./gradlew check` falha abaixo do mínimo. Medido em 11/10/2026 **só com os
+testes de unidade** — os `*IT` exigem Docker e elevam o número.
 
 | Métrica | Atual | Portão | Exigido pela fase |
 |---|---|---|---|
-| Linha | 65,3% | 65% | **80%** |
-| Instrução | 58,9% | 58% | **80%** |
-| Ramo | 45,9% | 45% | — |
+| Linha | 87,2% | 80% | 80% ✓ |
+| Instrução | 80,7% | 80% | 80% ✓ |
+| Ramo | 63,8% | 60% | — |
 
-> **O portão está no piso atual, não no exigido.** Deliberado: um portão em 80% hoje deixaria o
-> build vermelho sem dizer o que fazer. No piso, impede regressão desde já, e a dívida fica
-> escrita em vez de escondida.
+**O portão saiu do piso medido e passou a exigir o que a fase pede.** Até 11/10/2026 ele estava
+no piso (65/58/45) de propósito, porque um portão em 80% com 65% de cobertura deixaria o build
+vermelho sem dizer o que fazer. Hoje a dívida está paga.
 
-Onde está o descoberto, em linhas faltando:
+O que fechou a conta, em ordem de ganho:
 
-| Pacote | Cobertura | Faltando |
-|---|---|---|
-| `adapter/out/mapper` | 2,0% | 197 |
-| `entity/postgres` | 0% | 133 |
-| `config/mensageria` | 0% | 86 |
-| `entity/mongo` | 0% | 74 |
-| `adapter/out/repository/mongo` | 0% | 72 |
-| `adapter/web/error` | 60,6% | 61 |
+| O que entrou | Ganho |
+|---|---|
+| Ida e volta dos quatro mappers de persistência | linha 66% → 80% |
+| Adaptadores de Mongo de categoria e insumo | instrução 72,6% → 76,8% |
+| Contrato de erro dos treze tratadores | instrução → 77,9% |
+| Publicador da outbox | instrução → 80,7% |
 
-O domínio está em **88,6%** e o handler de estoque em 78,6%: **a lacuna é infraestrutura, não
-regra de negócio.** O maior ganho por esforço são os mappers — 197 linhas de função pura, de
-entidade para domínio e volta, sem dependência externa. Existe **um único** `*IT` no
-repositório, então Testcontainers não fecha essa conta sozinho.
+**A margem de instrução é de menos de um ponto.** Classe nova de infraestrutura sem teste
+derruba o portão, e é assim de propósito.
 
-O CI tem uma **guarda de segredos** que roda antes de compilar: falha se alguma chave privada
-estiver rastreada, se um PEM versionado contiver bloco privado, ou se ferramental local tiver
-vazado para o repositório.
+Os testes de Mongo usam `mockito-kotlin`, única parte do projeto que usa biblioteca de mock: as
+interfaces `MongoRepository` têm vinte métodos herdados, e escrever dublê à mão sairia pior que o
+teste.
 
----
 
 ## Como este serviço chega em hml e prd
 
