@@ -188,6 +188,34 @@ Como os ambientes são efêmeros e o baseline é sempre reaplicado do zero, **ed
 caminho normal**, não uma exceção. Em `hml` e `prd` quem aplica é `scripts/aplicar-baseline.sh`,
 pela esteira Banco.
 
+### Por que o Mongo é efêmero, e por que isso é dívida e não decisão
+
+O MongoDB roda **no cluster, como `mongo:7` de nó único, com `emptyDir`** — nos três ambientes,
+inclusive `hml` e `prd`. O Postgres, não: ele é RDS próprio, criado por `infra/terraform`.
+
+O que sustenta o arranjo hoje:
+
+- **A modelagem foi feita para não precisar de transação**, justamente porque um nó único sem
+  replica set não oferece transação. Está na `GLOBAL-RFC-012`. O que tem invariante numérico e
+  precisa de transação — saldo, reserva, movimento — ficou no Postgres.
+- **O baseline e o seed são reaplicados do zero** pela esteira Banco, então recriar o ambiente
+  recria o conteúdo.
+- Não custa nada e sobe junto com o serviço.
+
+**O que isso custa, e é aqui que vira dívida:** `emptyDir` morre com o pod, não só com o
+`destroy`. O Deployment do Mongo usa `strategy: Recreate`, então **qualquer rollout apaga
+categoria e insumo**, e o seed precisa ser reaplicado à mão. E categoria e insumo **não são dado
+descartável** — são cadastro, com o operador definindo atributos em tempo de execução. É **fonte
+de verdade em volume descartável**, e isso é diferente do Kafka, cuja perda é coberta pela OUTBOX
+no Postgres.
+
+**A decisão não está fechada.** A `GLOBAL-RFC-012` pergunta exatamente isto — `mongo:7` no
+cluster ou MongoDB Atlas na camada gratuita — e **recomenda o Atlas**: sobrevive ao `destroy`, é
+replica set, não custa, e sai dos overlays virando uma URI em `Secret`. Enquanto a RFC não fechar,
+o que está nos overlays continua valendo para demonstração, com a perda acima conhecida e escrita.
+
+Nenhuma demonstração deve depender de dado que alguém cadastrou no Mongo e não está no seed.
+
 ---
 
 ## Observabilidade

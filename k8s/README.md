@@ -25,7 +25,7 @@ k8s/
 | Dependência | local (kind) | hml e prd |
 |---|---|---|
 | Postgres `st_cat` | `componentes/postgres-efemero` | RDS do próprio serviço, criado por `infra/terraform` |
-| Mongo `ST_INS` | `componentes/mongo-efemero` | `componentes/mongo-efemero` |
+| Mongo `ST_INS` | `componentes/mongo-efemero` | `componentes/mongo-efemero` — **`emptyDir`: rollout do pod apaga o dado.** Por que, e por que é dívida: [README.md](../README.md#por-que-o-mongo-é-efêmero-e-por-que-isso-é-dívida-e-não-decisão) |
 | Broker Kafka | `componentes/kafka-efemero` | **broker do `service-track-ordens`**, por FQDN (`GLOBAL-ADR-011`) — este serviço não hospeda broker em ambiente compartilhado |
 
 ## Como se chega neste serviço
