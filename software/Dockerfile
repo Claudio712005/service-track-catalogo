@@ -67,7 +67,7 @@ RUN env -u OTEL_EXPORTER_OTLP_ENDPOINT \
          -Dspring.jpa.hibernate.ddl-auto=none \
          -Dspring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect \
          -Dspring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false \
-         -DST_INS_MONGO_URI=mongodb://localhost:27017/ST_INS \
+         -DMONGODB_URI=mongodb://localhost:27017/ST_INS \
          org.springframework.boot.loader.launch.JarLauncher > /preparo/treino.log 2>&1 \
     && test -s /preparo/aplicacao.jsa \
     || (echo "ERRO: o treino de CDS nao completou o refresh do contexto" \
