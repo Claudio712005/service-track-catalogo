@@ -159,7 +159,9 @@ Nada tem valor fixo de ambiente no código. O que não tem padrão é obrigatór
 | `ST_CAT_DB_PASSWORD` | — | senha do Postgres |
 | `ST_CAT_DB_POOL_MAX` | `10` | teto do pool, declarado no orçamento de conexão |
 | `ST_CAT_DB_POOL_MIN` | `2` | mínimo do pool |
-| `ST_INS_MONGO_URI` | — | URI do MongoDB `ST_INS` |
+| `MONGODB_URI` | — | URI do MongoDB `ST_INS`, sem credencial; em `hml`/`prd`, do `Secret` `service-track-catalogo-mongo`; no overlay `local`, do ConfigMap (`mongodb://service-track-catalogo-mongo:27017/ST_INS`); no Compose, da configuração local |
+| `MONGODB_USERNAME` | vazio no local | usuário do Atlas; em `hml`/`prd`, do `Secret` `service-track-catalogo-mongo`; overlay `local` e Compose não exigem usuário |
+| `MONGODB_PASSWORD` | vazio no local | senha do Atlas; em `hml`/`prd`, do `Secret` `service-track-catalogo-mongo`; overlay `local` e Compose não exigem senha |
 | `SERVICETRACK_JWT_CHAVE_PUBLICA` | `file:/keys/publicKey.pem` | chave pública RS256 que valida o token |
 | `SERVICETRACK_MENSAGERIA_HABILITADA` | `false` | liga consumidor, publicador e expiração |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` só no perfil `dev` | broker; obrigatório com a mensageria ligada |
@@ -169,7 +171,7 @@ Nada tem valor fixo de ambiente no código. O que não tem padrão é obrigatór
 | `SERVICETRACK_MENSAGERIA_CONCORRENCIA` | `1` | consumidores em paralelo |
 | `SERVICETRACK_EXPIRACAO_RESERVAS` | `true` | liga a rotina de expiração |
 
-**Credencial de banco nunca vem de ConfigMap nem do Terraform.** Em `hml` e `prd` ela vem de um
+**Credencial de banco em `hml` e `prd` nunca vem de ConfigMap nem do Terraform.** Ela vem de um
 `Secret` montado a partir do SSM pela esteira (`CAT-ADR-001`).
 
 ### Schema dos bancos
@@ -181,40 +183,64 @@ schema.
 |---|---|
 | `db/postgres/01_baseline_st_cat.sql` | schema `CATALOGO`: `SERVICOS`, `ESTOQUE_SALDOS`, `ESTOQUE_LOTES`, `ESTOQUE_RESERVAS`, `ESTOQUE_MOVIMENTOS`, `INBOX`, `OUTBOX` |
 | `db/postgres/02_seed_servicos.sql` | serviços de exemplo |
-| `db/mongo/01_baseline_st_ins.js` | coleções e índices de `CATEGORIAS` e `INSUMOS` |
+| `db/mongo/01_baseline_st_ins.js` | coleções e índices de `CATEGORIAS` e `INSUMOS`; em `hml`/`prd`, baseline aplicado no Atlas, de dentro do cluster |
 | `db/mongo/02_seed_st_ins.js` | categorias e insumos de exemplo |
 
-Como os ambientes são efêmeros e o baseline é sempre reaplicado do zero, **editar o seed é o
-caminho normal**, não uma exceção. Em `hml` e `prd` quem aplica é `scripts/aplicar-baseline.sh`,
-pela esteira Banco.
+O Postgres é efêmero e o baseline é sempre reaplicado do zero, então **editar o seed do Postgres
+é o caminho normal**, não uma exceção. Em `hml` e `prd` quem aplica é
+`scripts/aplicar-baseline.sh`, pela esteira Banco.
 
-### Por que o Mongo é efêmero, e por que isso é dívida e não decisão
+**No Mongo isso mudou com o Atlas, e é a armadilha nova.** O script aplica `db/mongo/*.js`
+inteiro, seed incluído, e `02_seed_st_ins.js` faz `replaceOne(..., upsert: true)` com
+`VERSAO: 0`. Em volume descartável isso era inócuo. Em banco que persiste, **cada rodada da
+esteira Banco sobrescreve as categorias e os insumos semeados e zera a versão otimista deles** —
+inclusive atributos que o operador tenha editado. Ambiente novo precisa do seed uma vez;
+reexecutar a esteira num ambiente com cadastro vivo, não. Verificado em 13/10/2026.
 
-O MongoDB roda **no cluster, como `mongo:7` de nó único, com `emptyDir`** — nos três ambientes,
-inclusive `hml` e `prd`. O Postgres, não: ele é RDS próprio, criado por `infra/terraform`.
+### O Mongo vive no Atlas, fora do cluster
 
-O que sustenta o arranjo hoje:
+Verificado em **13/10/2026**: em `hml` e `prd`, o MongoDB `ST_INS`, com as coleções
+`CATEGORIAS` e `INSUMOS`, vive no **MongoDB Atlas, camada gratuita M0, fora da AWS**.
+A `GLOBAL-ADR-012`, de **12/10/2026**, fecha a pergunta 1 da `GLOBAL-RFC-012`; o restante da
+RFC segue aberto. O Atlas oferece replica set, preserva os dados durante rollouts e sobrevive
+ao `destroy`, sem custo em dólar nessa camada e com um pod e cerca de 256Mi a menos no nó.
 
-- **A modelagem foi feita para não precisar de transação**, justamente porque um nó único sem
-  replica set não oferece transação. Está na `GLOBAL-RFC-012`. O que tem invariante numérico e
-  precisa de transação — saldo, reserva, movimento — ficou no Postgres.
-- **O baseline e o seed são reaplicados do zero** pela esteira Banco, então recriar o ambiente
-  recria o conteúdo.
-- Não custa nada e sobe junto com o serviço.
+Antes, o `mongo:7` no cluster usava `emptyDir` e `strategy: Recreate`: qualquer rollout
+apagava categoria e insumo. Esses cadastros guardam atributos definidos pelo operador em tempo
+de execução; eram fonte de verdade em volume descartável. A perda do Kafka, por sua vez, é
+coberta pela OUTBOX no Postgres.
 
-**O que isso custa, e é aqui que vira dívida:** `emptyDir` morre com o pod, não só com o
-`destroy`. O Deployment do Mongo usa `strategy: Recreate`, então **qualquer rollout apaga
-categoria e insumo**, e o seed precisa ser reaplicado à mão. E categoria e insumo **não são dado
-descartável** — são cadastro, com o operador definindo atributos em tempo de execução. É **fonte
-de verdade em volume descartável**, e isso é diferente do Kafka, cuja perda é coberta pela OUTBOX
-no Postgres.
+O overlay `local` continua com `mongo:7` no cluster, em `componentes/mongo-efemero`, com
+`emptyDir`. É divergência declarada pela mesma razão do broker (`GLOBAL-ADR-011`): o local
+existe para subir este repositório sozinho. O Docker Compose usa volumes nomeados para
+Postgres, Mongo e Kafka: os dados persistem entre subidas até `docker compose down -v`.
 
-**A decisão não está fechada.** A `GLOBAL-RFC-012` pergunta exatamente isto — `mongo:7` no
-cluster ou MongoDB Atlas na camada gratuita — e **recomenda o Atlas**: sobrevive ao `destroy`, é
-replica set, não custa, e sai dos overlays virando uma URI em `Secret`. Enquanto a RFC não fechar,
-o que está nos overlays continua valendo para demonstração, com a perda acima conhecida e escrita.
+As três variáveis são `MONGODB_URI`, `MONGODB_USERNAME` e `MONGODB_PASSWORD`. No Atlas, a URI
+tem a forma `mongodb+srv://<cluster>/ST_INS?...`, **sem credencial dentro**. A propriedade
+`spring.mongodb.uri` prevalece sobre as propriedades separadas de usuário e senha do Spring;
+por isso um `MongoClientSettingsBuilderCustomizer` aplica a credencial a partir de
+`servicetrack.mongodb.{username,password,auth-database}`. A senha não viaja na URI e não aparece
+por essa via em log do driver, dump de ConfigMap ou erro de conexão. Credencial em branco não
+ativa autenticação: o Compose e o smoke da esteira sobem sem usuário. Quatro testes em
+`MongoConfigTest` protegem esse comportamento.
 
-Nenhuma demonstração deve depender de dado que alguém cadastrou no Mongo e não está no seed.
+Em `hml`/`prd`, `scripts/criar-secret-do-mongo.sh` lê
+`/servicetrack/<env>/catalogo/mongodb/{uri,username,password}` do SSM e cria o `Secret`
+`service-track-catalogo-mongo`, com as três variáveis. A esteira Banco executa esse passo antes
+do baseline, seguindo o padrão SSM → `Secret`, também usado pelo banco e pela chave JWT, sem
+variável Terraform. O script recusa URI contendo `@` para impedir credencial embutida.
+
+O cluster Atlas é cadastrado manualmente, uma vez por ambiente, e **sobrevive ao `destroy`**.
+Assim como a hosted zone do Route53, é uma peça que não se recria por `apply`.
+`scripts/aplicar-baseline.sh` usa `kubectl exec` no Mongo do `local`; em `hml`/`prd`, usa
+`kubectl run` com a imagem do `mongosh`, de dentro do cluster, passando `--username` e
+`--password`. Assim aproveita a permissão de saída já necessária à aplicação, sem exigir
+uma segunda entrada para o IP dinâmico do runner do GitHub.
+
+**Custo aceito pela `GLOBAL-ADR-012`: liberar `0.0.0.0/0` na lista de IPs do Atlas M0.**
+O egresso do cluster passa pelo NAT Gateway, cuja EIP é criada no `apply` e muda a cada
+recriação do ambiente. Manter a lista restrita exigiria atualizá-la em todo ciclo. A escolha
+se apoia em senha forte e no TLS obrigatório do Atlas.
 
 ---
 
@@ -298,7 +324,7 @@ Quatro esteiras, nesta ordem, todas acionadas à mão:
 | # | Esteira | O que faz |
 |---|---|---|
 | 1 | **Infra** | `infra/terraform`: ECR, RDS `st_cat`, parâmetros no SSM. Chama a Banco ao terminar |
-| 2 | **Banco** | cria o `Secret` a partir do SSM e aplica o baseline |
+| 2 | **Banco** | cria os Secrets do Postgres e do Atlas a partir do SSM antes de aplicar o baseline (estado verificado em 13/10/2026) |
 | 3 | **CI** | guarda de segredos, build, testes e imagem |
 | 4 | **CD** | publica a imagem no ECR e abre PR escrevendo `newName` e `newTag` no overlay |
 

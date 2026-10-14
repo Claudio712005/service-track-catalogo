@@ -23,7 +23,7 @@ spring:
         jdbc:
           time_zone: UTC
   mongodb:
-    uri: ${ST_INS_MONGO_URI}
+    uri: ${MONGODB_URI}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:}
     client-id: ${spring.application.name}
@@ -63,6 +63,10 @@ logging:
     org.apache.kafka.common.utils.AppInfoParser: WARN
 
 servicetrack:
+  mongodb:
+    username: ${MONGODB_USERNAME:}
+    password: ${MONGODB_PASSWORD:}
+    auth-database: admin
   mensageria:
     habilitada: ${SERVICETRACK_MENSAGERIA_HABILITADA:false}
     grupo: ${SERVICETRACK_MENSAGERIA_GRUPO:catalogo-estoque}
@@ -123,7 +127,7 @@ spring:
     username: ${ST_CAT_DB_USER:st_cat_user}
     password: ${ST_CAT_DB_PASSWORD:st_cat_local}
   mongodb:
-    uri: ${ST_INS_MONGO_URI:mongodb://localhost:27017/ST_INS?serverSelectionTimeoutMS=2000&connectTimeoutMS=2000}
+    uri: ${MONGODB_URI:mongodb://localhost:27017/ST_INS?serverSelectionTimeoutMS=2000&connectTimeoutMS=2000}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 

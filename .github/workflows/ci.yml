@@ -203,7 +203,7 @@ jobs:
             -e ST_CAT_DB_URL=jdbc:postgresql://postgres:5432/st_cat \
             -e ST_CAT_DB_USER=st_cat_user \
             -e ST_CAT_DB_PASSWORD=st_cat_ci \
-            -e ST_INS_MONGO_URI=mongodb://mongo:27017/ST_INS \
+            -e MONGODB_URI=mongodb://mongo:27017/ST_INS \
             -e SERVICETRACK_MENSAGERIA_HABILITADA=true \
             -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
             -p 8080:8080 \

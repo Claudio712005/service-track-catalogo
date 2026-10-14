@@ -7,13 +7,13 @@ daqui, ninguém roda `kubectl apply` na aplicação.
 k8s/
 ├── base/                    Deployment, Service ClusterIP, namespace, HPA
 ├── componentes/
-│   ├── mongo-efemero/       Mongo de dado descartável, usado por local, hml e prd
+│   ├── mongo-efemero/       Mongo com emptyDir, só no local
 │   ├── postgres-efemero/    Postgres de dado descartável, só no local
 │   ├── kafka-efemero/       Broker KRaft de nó único, só no local
 ├── overlays/
 │   ├── local/               kind, imagem local, os três bancos/broker em contêiner
-│   ├── hml/                 ECR de hml, HPA 1..2, Mongo efêmero, Postgres no RDS
-│   └── prd/                 ECR de prd, HPA 2..4, Mongo efêmero, Postgres no RDS
+│   ├── hml/                 ECR de hml, HPA 1..2, Mongo no Atlas, Postgres no RDS
+│   └── prd/                 ECR de prd, HPA 2..4, Mongo no Atlas, Postgres no RDS
 └── argocd/
     ├── local.yaml           Application do kind, aplicada à mão
     ├── hml.yaml             marcador de descoberta
@@ -25,7 +25,7 @@ k8s/
 | Dependência | local (kind) | hml e prd |
 |---|---|---|
 | Postgres `st_cat` | `componentes/postgres-efemero` | RDS do próprio serviço, criado por `infra/terraform` |
-| Mongo `ST_INS` | `componentes/mongo-efemero` | `componentes/mongo-efemero` — **`emptyDir`: rollout do pod apaga o dado.** Por que, e por que é dívida: [README.md](../README.md#por-que-o-mongo-é-efêmero-e-por-que-isso-é-dívida-e-não-decisão) |
+| Mongo `ST_INS` | `componentes/mongo-efemero` | **MongoDB Atlas (`GLOBAL-ADR-012`)**, com URI e credencial no `Secret` `service-track-catalogo-mongo`; [detalhes](../README.md#o-mongo-vive-no-atlas-fora-do-cluster) |
 | Broker Kafka | `componentes/kafka-efemero` | **broker do `service-track-ordens`**, por FQDN (`GLOBAL-ADR-011`) — este serviço não hospeda broker em ambiente compartilhado |
 
 ## Como se chega neste serviço
@@ -76,12 +76,19 @@ O `secretRef` no `base/deployment.yaml` é `optional: true` justamente porque no
 existe Secret: lá as credenciais do Postgres efêmero vêm nas literais do ConfigMap do overlay,
 que são descartáveis por definição.
 
+`hml` e `prd` também recebem `MONGODB_URI`, `MONGODB_USERNAME` e
+`MONGODB_PASSWORD` do `Secret` `service-track-catalogo-mongo`. Antes do baseline, a esteira
+Banco chama `scripts/criar-secret-do-mongo.sh`, que lê
+`/servicetrack/<env>/catalogo/mongodb/{uri,username,password}` do SSM. A URI não contém
+credencial; o script recusa `@`. No overlay `local`, `MONGODB_URI` vem do
+`configMapGenerator`: `mongodb://service-track-catalogo-mongo:27017/ST_INS`, sem autenticação.
+
 ## Ordem de subida do ambiente
 
 ```
 1. rede e EKS            (service-track-aws-iac)
 2. esteira Infra         (deste repo: ECR + RDS + SSM, e ela chama a esteira Banco)
-3. esteira Banco         (segredo do banco, baseline do Postgres e do Mongo, restart da app)
+3. esteira Banco         (segredos do Postgres e do Atlas via SSM, baseline, restart da app)
 4. esteira CD            (imagem no ECR + PR com a nova tag)
 5. merge do PR           (ArgoCD sincroniza o overlay do ambiente)
 ```
@@ -89,8 +96,11 @@ que são descartáveis por definição.
 Sem Flyway, `ddl-auto: validate` recusa banco vazio: é esperado ver `CrashLoopBackOff` até o
 passo 3 ter rodado com o cluster de pé. Não é defeito de manifesto.
 
-A esteira Banco é idempotente e pode ser reexecutada a qualquer momento — inclusive depois do
-passo 5, que é quando o pod do Mongo costuma existir pela primeira vez.
+A esteira Banco é idempotente e pode ser reexecutada. Em `hml`/`prd`, o cluster Atlas precisa
+ser cadastrado manualmente uma vez por ambiente, antes do baseline; ele sobrevive ao `destroy`.
+Não há pod de banco Mongo nesses overlays. O baseline usa `kubectl run` com a imagem do
+`mongosh`, de dentro do cluster, passando `--username` e `--password`; no `local`, continua
+usando `kubectl exec` no pod Mongo.
 
 ## Como este serviço chega em hml e prd
 
@@ -435,16 +445,17 @@ Copiar este diretório inteiro para o repositório novo e substituir
 probes, os requests e a ausência de exposição externa se aplicam a qualquer
 microsserviço interno.
 
-## Banco em hml e prd: Mongo efêmero
+## Banco em hml e prd: MongoDB Atlas
 
-`componentes/mongo-efemero` sobe um `mongo:7` de uma réplica, com `emptyDir`, dentro do
-namespace do serviço. **O dado se perde a cada restart do pod** — é o suficiente para
-demonstrar o serviço de pé, não para guardar nada.
+O MongoDB `ST_INS` vive no Atlas M0, fora da AWS, conforme a
+`GLOBAL-ADR-012` de **12/10/2026**. Os cadastros sobrevivem ao rollout da aplicação e ao
+`destroy` do ambiente. `componentes/mongo-efemero`, com `mongo:7` e `emptyDir`, fica apenas
+no `local`, para permitir subir o repositório sozinho, como o broker (`GLOBAL-ADR-011`).
 
-Está aqui, e não no `aws-iac`, porque banco de microsserviço é do microsserviço. Sai quando
-`GLOBAL-RFC-009` decidir a arquitetura de dados (MongoDB Atlas, DocumentDB ou outra coisa);
-trocar significa mudar `SPRING_MONGODB_URI` no `configMapGenerator` do overlay e remover o
-componente.
+O egresso do cluster passa pelo NAT Gateway, cuja EIP muda a cada recriação. A
+`GLOBAL-ADR-012` aceita liberar `0.0.0.0/0` na lista de IPs do Atlas M0, com senha forte e
+TLS obrigatório. O baseline roda de dentro do cluster e aproveita a mesma permissão da
+aplicação, sem adicionar o IP dinâmico do runner do GitHub.
 
 O grupo `readiness` do Spring **não** inclui o Mongo: o pod fica `Ready` mesmo sem banco, e
 só `/actuator/health` (completo) acusa `DOWN`. Por isso a esteira de CI sobe um Mongo ao lado
@@ -458,15 +469,10 @@ inalcançável.
   a partir de um template próprio — o conteúdo daqui não é o que vai para o
   cluster em `hml`/`prd`. Mantido alinhado (`project: service-track`) para que
   o `kubectl apply` manual do fluxo local produza a mesma coisa.
-- **Mongo efêmero é provisório.** `emptyDir`, sem réplica, sem backup, sem senha. Serve a
-  demonstração e some quando a arquitetura de dados fechar.
-- **Sem MongoDB no overlay local.** O repositório de serviços hoje é
-  `ServicoRepositoryMemoriaAdapter`, em memória. Para exercitar o Mongo
-  localmente, basta incluir o componente no `kustomization.yaml` do overlay
-  `local` e apontar `SPRING_MONGODB_URI` para ele.
-- **Sem JWT em `hml` e `prd`.** `servicetrack.security.jwt.habilitado` continua
-  `false` no `application.yaml`. A Lambda de autenticação está desligada no
-  `aws-iac` (`habilitar_autenticacao = false`), então nem existe emissor de
-  token nem chave pública publicada no SSM hoje.
+- **Este serviço não valida JWT, e isso é desenho.** `servicetrack.security.jwt.habilitado`
+  é `false` no `application.yaml`. Quem valida token é o BFF, o único alcançável por gateway
+  (`IAC-ADR-035`); daqui para dentro o tráfego já passou pela borda. A autenticação em si está
+  ligada por padrão no `aws-iac` desde o `IAC-ADR-036`, com emissor na Lambda e chave pública
+  no SSM — não é a ausência de emissor que mantém a flag desligada aqui.
 - **Sem OTLP local.** Nenhum coletor de observabilidade roda no kind hoje;
   `OTEL_JAVAAGENT_ENABLED=false` reflete isso, não uma escolha permanente.

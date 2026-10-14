@@ -76,6 +76,10 @@ jobs:
         if: steps.prereq.outputs.pular == 'false'
         run: bash scripts/criar-secret-do-banco.sh "${{ inputs.env }}"
 
+      - name: Criar o segredo do MongoDB Atlas a partir do SSM
+        if: steps.prereq.outputs.pular == 'false'
+        run: bash scripts/criar-secret-do-mongo.sh "${{ inputs.env }}"
+
       - name: Aplicar o baseline do Postgres e do Mongo
         if: steps.prereq.outputs.pular == 'false'
         env:
@@ -108,6 +112,7 @@ jobs:
               echo "| Etapa | Estado |"
               echo "|---|---|"
               echo "| Segredo do banco no cluster | aplicado a partir do SSM |"
+              echo "| Segredo do MongoDB Atlas no cluster | aplicado a partir do SSM |"
               echo "| Baseline e seed do Postgres | aplicado de dentro do cluster |"
               echo "| Baseline e seed do Mongo | aplicado se o pod existia |"
               echo ""

@@ -28,6 +28,9 @@ spec:
             - secretRef:
                 name: service-track-catalogo-db
                 optional: true
+            - secretRef:
+                name: service-track-catalogo-mongo
+                optional: true
           startupProbe:
             httpGet:
               path: /actuator/health/readiness

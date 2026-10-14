@@ -33,6 +33,18 @@ else
   PG_USER="$(ler username)"
   PG_SENHA="$(ler password)"
   PG_BANCO="$(ler name)"
+
+  ler_mongo() {
+    aws ssm get-parameter \
+      --name "/$PROJETO/$AMBIENTE/$SERVICO/mongodb/$1" \
+      --with-decryption \
+      --region "$REGIAO" \
+      --query Parameter.Value \
+      --output text
+  }
+  MONGO_URI="$(ler_mongo uri)"
+  MONGO_USER="$(ler_mongo username)"
+  MONGO_SENHA="$(ler_mongo password)"
 fi
 
 kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -59,15 +71,39 @@ aplicar_sql() {
     < "$arquivo"
 }
 
-aplicar_js() {
+aplicar_js_no_pod() {
   local arquivo="$1" pod="$2"
   echo "mongo <- $(basename "$arquivo")"
   kubectl exec -i -n "$NAMESPACE" "$pod" -- mongosh "mongodb://localhost:27017/ST_INS" --quiet < "$arquivo"
 }
 
+aplicar_js_no_atlas() {
+  local arquivo="$1"
+  echo "atlas <- $(basename "$arquivo")"
+  kubectl run "baseline-mongo-$RANDOM" \
+    --namespace "$NAMESPACE" \
+    --rm --stdin --quiet --restart=Never \
+    --image=mongodb/mongodb-community-server:7.0-ubi8 \
+    --env "MONGO_SENHA=$MONGO_SENHA" \
+    --command -- mongosh "$MONGO_URI" \
+      --username "$MONGO_USER" \
+      --password "$MONGO_SENHA" \
+      --quiet \
+    < "$arquivo"
+}
+
 for arquivo in "$RAIZ"/db/postgres/*.sql; do
   aplicar_sql "$arquivo"
 done
+
+if [[ "$AMBIENTE" != "local" ]]; then
+  for arquivo in "$RAIZ"/db/mongo/*.js; do
+    aplicar_js_no_atlas "$arquivo"
+  done
+  echo "baseline de $AMBIENTE aplicado. Reexecutar e seguro: os scripts sao idempotentes."
+  echo "O Atlas sobrevive ao destroy: o conteudo do Mongo nao e recriado junto com o ambiente."
+  exit 0
+fi
 
 POD_MONGO="$(pod_do_mongo)"
 
@@ -82,7 +118,7 @@ if [[ -z "$POD_MONGO" ]]; then
 fi
 
 for arquivo in "$RAIZ"/db/mongo/*.js; do
-  aplicar_js "$arquivo" "$POD_MONGO"
+  aplicar_js_no_pod "$arquivo" "$POD_MONGO"
 done
 
 echo "baseline de $AMBIENTE aplicado. Reexecutar e seguro: os scripts sao idempotentes."

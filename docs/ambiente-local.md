@@ -34,8 +34,9 @@ Postgres roda os `.sql` e o Mongo roda os `.js` na primeira subida, em ordem alf
 baseline e depois seed. Não há cópia do SQL dentro do Compose — a fonte continua sendo
 `db/`, a mesma que o ritual de ambiente aplica em `hml` e `prd`.
 
-Consequência: **o init só roda com volume vazio**. `docker compose down` preserva os
-volumes, e a próxima subida encontra o schema já criado — que é exatamente o que
+Consequência: **o init só roda com volume vazio**. Postgres, Mongo e Kafka usam volumes
+nomeados: `docker compose down` preserva os dados entre subidas, e a próxima subida
+encontra o schema já criado — que é exatamente o que
 `ddl-auto: validate` exige. Para voltar ao estado de fábrica:
 
 ```bash
@@ -93,9 +94,15 @@ a fila quando o broker volta.
 
 ## Isto não é como `hml` e `prd` funcionam
 
-Aqui os três bancos são contêineres descartáveis com senha literal no arquivo. Em `hml` e
-`prd`, o Postgres é RDS provisionado por [`infra/terraform`](../infra/README.md), a
-credencial vem do SSM para um Secret do Kubernetes, o baseline é aplicado pelo ritual de
-ambiente, e a mensageria fica desligada por flag enquanto o broker da plataforma não
-existir. O Compose serve ao desenvolvimento e à demonstração local — não é o desenho de
-ambiente gerenciado.
+Verificado em **13/10/2026**: no Compose, Postgres, Mongo e Kafka rodam em contêineres
+com volumes nomeados, cujos dados persistem até `docker compose down -v`. O Mongo local usa
+`MONGODB_URI`, sem autenticação; `MONGODB_USERNAME` e `MONGODB_PASSWORD` ficam vazios.
+
+Em `hml` e `prd`, o Postgres é RDS provisionado por `infra/terraform`, e o Mongo `ST_INS`
+vive no Atlas M0 (`GLOBAL-ADR-012`), preservando cadastros mesmo após o `destroy`. As três
+variáveis Mongo vêm do `Secret` `service-track-catalogo-mongo`, criado pela esteira Banco a
+partir do SSM antes do baseline. O baseline Mongo roda de dentro do cluster com `mongosh`.
+A mensageria está ligada contra o broker do `service-track-ordens` (`GLOBAL-ADR-011`).
+O overlay Kubernetes `local` mantém Mongo e broker próprios para subir este repositório
+sozinho; o Mongo desse overlay usa `emptyDir`, sem a persistência do Compose. Detalhes da
+migração e da lista de IPs do Atlas no [README](../README.md#o-mongo-vive-no-atlas-fora-do-cluster).
