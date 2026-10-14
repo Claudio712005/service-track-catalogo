@@ -469,9 +469,10 @@ inalcançável.
   a partir de um template próprio — o conteúdo daqui não é o que vai para o
   cluster em `hml`/`prd`. Mantido alinhado (`project: service-track`) para que
   o `kubectl apply` manual do fluxo local produza a mesma coisa.
-- **Sem JWT em `hml` e `prd`.** `servicetrack.security.jwt.habilitado` continua
-  `false` no `application.yaml`. A Lambda de autenticação está desligada no
-  `aws-iac` (`habilitar_autenticacao = false`), então nem existe emissor de
-  token nem chave pública publicada no SSM hoje.
+- **Este serviço não valida JWT, e isso é desenho.** `servicetrack.security.jwt.habilitado`
+  é `false` no `application.yaml`. Quem valida token é o BFF, o único alcançável por gateway
+  (`IAC-ADR-035`); daqui para dentro o tráfego já passou pela borda. A autenticação em si está
+  ligada por padrão no `aws-iac` desde o `IAC-ADR-036`, com emissor na Lambda e chave pública
+  no SSM — não é a ausência de emissor que mantém a flag desligada aqui.
 - **Sem OTLP local.** Nenhum coletor de observabilidade roda no kind hoje;
   `OTEL_JAVAAGENT_ENABLED=false` reflete isso, não uma escolha permanente.
