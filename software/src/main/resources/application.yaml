@@ -49,6 +49,9 @@ spring:
       observation-enabled: true
 
 logging:
+  structured:
+    format:
+      console: ${ST_CAT_LOG_FORMAT:logstash}
   pattern:
     correlation: "[${spring.application.name:catalogo},%X{traceId:-},%X{spanId:-},%X{correlationId:-},%X{requestId:-}] "
   level:
