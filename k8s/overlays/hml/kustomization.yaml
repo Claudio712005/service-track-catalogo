@@ -9,7 +9,7 @@ resources:
 images:
   - name: servicetrack-catalogo
     newName: 734564927706.dkr.ecr.us-east-1.amazonaws.com/servicetrack-hml-catalogo
-    newTag: 16e6870719b876c4c6a262729c07718ec83ed1e0
+    newTag: 488df1c4cb4370a6963229770f2153357ff67057
 
 patches:
   - path: hpa-patch.yaml
